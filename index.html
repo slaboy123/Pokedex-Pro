@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pokédex Pro</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+<header class="container">
+  <h2>Pokédex</h2>
+  <div class="header-actions">
+    <button id="themeToggle" class="theme-toggle" type="button" aria-label="Alternar modo escuro e claro">
+      Modo claro
+    </button>
+    <input id="search" placeholder="Buscar Pokémon...">
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- GERAÇÕES -->
+  <div class="generations">
+    <button onclick="setGen(this,1)">Gen 1</button>
+    <button onclick="setGen(this,2)">Gen 2</button>
+    <button onclick="setGen(this,3)">Gen 3</button>
+    <button onclick="setGen(this,4)">Gen 4</button>
+    <button onclick="setGen(this,5)">Gen 5</button>
+    <button onclick="setGen(this,6)">Gen 6</button>
+    <button onclick="setGen(this,7)">Gen 7</button>
+    <button onclick="setGen(this,8)">Gen 8</button>
+    <button onclick="setGen(this,9)">Gen 9</button>
+  </div>
+
+  <!-- LOADING -->
+  <div id="loader" class="loader">
+    Carregando Pokémons...
+  </div>
+
+  <!-- GRID DE POKÉMONS -->
+  <section id="grid" class="grid"></section>
+
+</main>
+
+<!-- MODAL DETALHADO -->
+<div id="modal" class="modal">
+  <div id="modalContent" class="modal-box">
+
+    <!-- HEADER -->
+    <div class="modal-header">
+      Nome do Pokémon Nº 0000
+    </div>
+
+    <!-- TOPO -->
+    <div class="modal-top">
+
+      <!-- IMAGEM -->
+      <div class="modal-img">
+        <img src="" alt="pokemon">
+      </div>
+
+      <!-- INFORMAÇÕES -->
+      <div class="modal-info">
+        <p><strong>Altura:</strong> --</p>
+        <p><strong>Peso:</strong> --</p>
+        <p><strong>Habilidades:</strong> --</p>
+
+        <div class="modal-types">
+          <!-- Tipos -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- DESCRIÇÃO -->
+    <div class="desc">
+      Descrição do Pokémon aparecerá aqui.
+    </div>
+
+    <!-- STATS -->
+    <div class="stats">
+      <h3>Estatísticas</h3>
+
+      <div class="stat">
+        <small>HP</small>
+        <div class="bar"><div class="fill"></div></div>
+      </div>
+
+      <div class="stat">
+        <small>Ataque</small>
+        <div class="bar"><div class="fill"></div></div>
+      </div>
+
+      <div class="stat">
+        <small>Defesa</small>
+        <div class="bar"><div class="fill"></div></div>
+      </div>
+
+      <div class="stat">
+        <small>Velocidade</small>
+        <div class="bar"><div class="fill"></div></div>
+      </div>
+
+    </div>
+
+    <!-- BOTÃO -->
+    <button class="close-btn" onclick="closeModal()">Fechar</button>
+
+  </div>
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
