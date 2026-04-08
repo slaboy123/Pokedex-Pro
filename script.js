@@ -34,13 +34,29 @@ const loader = document.getElementById('loader');
 const modal = document.getElementById('modal');
 const modalContent = document.getElementById('modalContent');
 const searchInput = document.getElementById('search');
+const themeToggle = document.getElementById('themeToggle');
 
 // ================= STATE =================
 let state = {
   currentGeneration: 1,
   pokemons: [],
-  cache: new Map()
+  cache: new Map(),
+  theme: 'dark'
 };
+
+const THEME_STORAGE_KEY = 'pokedex-pro-theme';
+
+function applyTheme(theme) {
+  state.theme = theme;
+  document.body.dataset.theme = theme;
+  themeToggle.textContent = theme === 'dark' ? 'Modo claro' : 'Modo escuro';
+  themeToggle.setAttribute('aria-label', theme === 'dark' ? 'Alternar para modo claro' : 'Alternar para modo escuro');
+  localStorage.setItem(THEME_STORAGE_KEY, theme);
+}
+
+function toggleTheme() {
+  applyTheme(state.theme === 'dark' ? 'light' : 'dark');
+}
 
 // ================= UTIL =================
 
@@ -196,7 +212,6 @@ async function openModal(p) {
   });
 
   const abilityNames = res.abilities.map(a => capitalize(a.ability.name));
-  const abilities = abilityNames.join(', ');
   const abilityBadges = abilityNames.map(name => `<span class="ability-badge">${name}</span>`).join('');
 
   const speciesData = await fetch(`${API_BASE}/pokemon-species/${p.id}`).then(r => r.json());
@@ -218,6 +233,23 @@ async function openModal(p) {
 
   const evolutionPokemons = await Promise.all(evolutionNames.map(n => getPokemonByName(n)));
 
+  const specialFormNames = (speciesData.varieties || [])
+    .map(v => v.pokemon?.name)
+    .filter(Boolean)
+    .filter(name => name.includes('-mega') || name.includes('-gmax'));
+
+  const specialForms = await Promise.all(
+    [...new Set(specialFormNames)].map(name => getPokemonByName(name).catch(() => null))
+  );
+
+  const megaForms = specialForms
+    .filter(Boolean)
+    .filter(form => form.name.toLowerCase().includes('-mega'));
+
+  const gigamaxForms = specialForms
+    .filter(Boolean)
+    .filter(form => form.name.toLowerCase().includes('-gmax'));
+
   const typeTypeData = await Promise.all(p.types.map(t => fetch(`${API_BASE}/type/${t.key}`).then(r => r.json())));
   const weaknessKeys = [...new Set(typeTypeData.flatMap(data => data.damage_relations.double_damage_from.map(i => i.name)))];
   const weaknesses = weaknessKeys.map(key => ({
@@ -232,17 +264,17 @@ async function openModal(p) {
         <h2>${p.name} #${String(p.id).padStart(4,'0')}</h2>
         <button class="close-btn" style="background:${p.color};" onclick="closeModal()" aria-label="Close">✕</button>
       </div>
-      <div style="display:flex; flex-direction:column; gap:20px; max-width:600px">
+      <div class="modal-body">
 
-      <div style="display:flex; gap:20px; flex-wrap:wrap">
+      <div class="modal-top-grid">
 
         <!-- IMAGEM -->
-        <div style="flex:1; text-align:center">
+        <div class="modal-image-wrap">
           <img src="${p.img}" style="width:180px">
         </div>
 
         <!-- INFO -->
-        <div style="flex:1; background:#1a1a1a; padding:15px; border-radius:12px">
+        <div class="modal-info-panel">
           <p><strong>Height:</strong> ${(res.height / 10).toFixed(1)} m</p>
           <p><strong>Weight:</strong> ${(res.weight / 10).toFixed(1)} kg</p>
           <p><strong>Abilities:</strong></p>
@@ -261,7 +293,7 @@ async function openModal(p) {
       </div>
 
       <!-- WEAKNESSES -->
-      <div style="background:#111; padding:15px; border-radius:12px">
+      <div class="modal-section-card">
         <h3>Weaknesses</h3>
         <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
           ${weaknesses.length > 0 ? weaknesses.map(w => `<span class="type" style="background:${w.color}; color:#000;">${w.label}</span>`).join('') : '<span>No weaknesses</span>'}
@@ -269,11 +301,11 @@ async function openModal(p) {
       </div>
 
       <!-- EVOLUTION -->
-      <div style="background:#111; padding:15px; border-radius:12px">
+      <div class="modal-section-card">
         <h3>Evolution</h3>
-        <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:8px;">
+        <div class="evolution-grid">
           ${evolutionPokemons.map(ep =>
-            `<button onclick="openModalById(${ep.id})" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; border:1px solid #333; background:#1e1e2a; color:#fff; border-radius:12px; padding:8px; min-width:100px; cursor:pointer;">
+            `<button onclick="openModalById(${ep.id})" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; border:1px solid var(--border); background:var(--surface-2); color:var(--text); border-radius:12px; padding:8px; min-width:100px; cursor:pointer;">
               <img src="${ep.img}" alt="${ep.name}" style="width:60px;height:60px; object-fit:contain;" />
               <small>#${formatId(ep.id)}</small>
               <span style="font-weight:600;">${ep.name}</span>
@@ -281,15 +313,45 @@ async function openModal(p) {
           ).join('')}
         </div>
       </div>
+
+      <!-- MEGA EVOLUTIONS -->
+      ${megaForms.length > 0 ? `
+      <div class="modal-section-card">
+        <h3>Mega Evoluções</h3>
+        <div class="evolution-grid">
+          ${megaForms.map(form => `
+            <button onclick="openModalById(${form.id})" class="form-card form-card--mega">
+              <img src="${form.img}" alt="${form.name}" class="form-card__img" />
+              <small>#${formatId(form.id)}</small>
+              <span>${capitalize(form.name.replace(/-/g, ' '))}</span>
+            </button>
+          `).join('')}
+        </div>
+      </div>` : ''}
+
+      <!-- GIGANTAMAX -->
+      ${gigamaxForms.length > 0 ? `
+      <div class="modal-section-card">
+        <h3>Gigantamax</h3>
+        <div class="evolution-grid">
+          ${gigamaxForms.map(form => `
+            <button onclick="openModalById(${form.id})" class="form-card form-card--gmax">
+              <img src="${form.img}" alt="${form.name}" class="form-card__img" />
+              <small>#${formatId(form.id)}</small>
+              <span>${capitalize(form.name.replace(/-/g, ' '))}</span>
+            </button>
+          `).join('')}
+        </div>
+      </div>` : ''}
       </div>
 
       <!-- DESCRIÇÃO -->
-      <div style="background:#111; padding:15px; border-radius:12px">
+      <div class="modal-section-card modal-description">
         ${p.full}
       </div>
 
       <!-- STATS -->
-      <div style="background:#111; padding:15px; border-radius:12px">
+      <div class="modal-section-card modal-stats">
         <h3>Stats</h3>
         ${stats.map(s => `
           <div class="stat-row">
@@ -368,8 +430,10 @@ searchInput.addEventListener('input', (e) => {
   handleSearch(e.target.value);
 });
 
-// Inicializar
-loadGeneration(1);
+themeToggle.addEventListener('click', toggleTheme);
+
+const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+applyTheme(savedTheme === 'light' ? 'light' : 'dark');
 
 // ================= UI =================
 function setActive(btn, gen) {
@@ -382,6 +446,7 @@ function setActive(btn, gen) {
 
 // ================= INIT =================
 function init() {
+  document.querySelector('.generations button')?.classList.add('active');
   loadGeneration(1);
 }
 
