@@ -106,10 +106,16 @@ export interface TypeDamageRelation {
   no_damage_to: NamedAPIResource[];
 }
 
+export interface TypePokemonEntry {
+  slot: number;
+  pokemon: NamedAPIResource;
+}
+
 export interface TypeResponse {
   id: number;
   name: string;
   damage_relations: TypeDamageRelation;
+  pokemon: TypePokemonEntry[];
 }
 
 export interface AbilityFlavorTextEntry {
