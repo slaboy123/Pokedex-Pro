@@ -363,6 +363,36 @@ header {
   justify-content: center;
 }
 
+.form-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 8px;
+  min-width: 100px;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.form-card__img {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+}
+
+.form-card--mega {
+  border-color: rgba(168, 85, 247, 0.35);
+}
+
+.form-card--gmax {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
 .modal-description,
 .modal-stats {
   width: 100%;
@@ -446,6 +476,15 @@ header {
   .evolution-grid > button {
     min-width: 92px;
     flex: 0 0 auto;
+  }
+
+  .form-card {
+    min-width: 92px;
+  }
+
+  .form-card__img {
+    width: 52px;
+    height: 52px;
   }
 }
 

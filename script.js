@@ -233,6 +233,23 @@ async function openModal(p) {
 
   const evolutionPokemons = await Promise.all(evolutionNames.map(n => getPokemonByName(n)));
 
+  const specialFormNames = (speciesData.varieties || [])
+    .map(v => v.pokemon?.name)
+    .filter(Boolean)
+    .filter(name => name.includes('-mega') || name.includes('-gmax'));
+
+  const specialForms = await Promise.all(
+    [...new Set(specialFormNames)].map(name => getPokemonByName(name).catch(() => null))
+  );
+
+  const megaForms = specialForms
+    .filter(Boolean)
+    .filter(form => form.name.toLowerCase().includes('-mega'));
+
+  const gigamaxForms = specialForms
+    .filter(Boolean)
+    .filter(form => form.name.toLowerCase().includes('-gmax'));
+
   const typeTypeData = await Promise.all(p.types.map(t => fetch(`${API_BASE}/type/${t.key}`).then(r => r.json())));
   const weaknessKeys = [...new Set(typeTypeData.flatMap(data => data.damage_relations.double_damage_from.map(i => i.name)))];
   const weaknesses = weaknessKeys.map(key => ({
@@ -296,6 +313,36 @@ async function openModal(p) {
           ).join('')}
         </div>
       </div>
+
+      <!-- MEGA EVOLUTIONS -->
+      ${megaForms.length > 0 ? `
+      <div class="modal-section-card">
+        <h3>Mega Evoluções</h3>
+        <div class="evolution-grid">
+          ${megaForms.map(form => `
+            <button onclick="openModalById(${form.id})" class="form-card form-card--mega">
+              <img src="${form.img}" alt="${form.name}" class="form-card__img" />
+              <small>#${formatId(form.id)}</small>
+              <span>${capitalize(form.name.replace(/-/g, ' '))}</span>
+            </button>
+          `).join('')}
+        </div>
+      </div>` : ''}
+
+      <!-- GIGANTAMAX -->
+      ${gigamaxForms.length > 0 ? `
+      <div class="modal-section-card">
+        <h3>Gigantamax</h3>
+        <div class="evolution-grid">
+          ${gigamaxForms.map(form => `
+            <button onclick="openModalById(${form.id})" class="form-card form-card--gmax">
+              <img src="${form.img}" alt="${form.name}" class="form-card__img" />
+              <small>#${formatId(form.id)}</small>
+              <span>${capitalize(form.name.replace(/-/g, ' '))}</span>
+            </button>
+          `).join('')}
+        </div>
+      </div>` : ''}
       </div>
 
       <!-- DESCRIÇÃO -->

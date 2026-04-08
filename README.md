@@ -1,3 +1,22 @@
+# Pokédex Pro
+
+Neon-themed Pokémon Pokédex built with Vite, React, TypeScript, TailwindCSS, Zustand and Framer Motion.
+
+## Run
+
+```bash
+npm install
+npm run dev
+```
+
+## Included
+
+- Infinite scroll Pokédex
+- Search and filters by type, generation and ability
+- Pokémon details modal with stats, abilities, evolution tree, moves and type effectiveness
+- Favorites persisted in localStorage
+- Team builder with coverage summary
+- Battle Simulator Lite with turn-based combat
 🚀 Pokedex-Pro
 
 Uma Pokédex moderna, responsiva e orientada à experiência do usuário, desenvolvida com foco em performance, escalabilidade e design refinado.
