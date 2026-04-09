@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import { useTeamStore } from '@/store/teamStore';
-import { getTypeColor, capitalize } from '@/utils/pokemon';
-import { useToastStore } from '@/store/toastStore';
+import { useTeamStore } from '../../../store/teamStore';
+import { getTypeColor, capitalize } from '../../../utils/pokemon';
+import { useToastStore } from '../../../store/toastStore';
 
 export const TeamBuilder = (): JSX.Element => {
   const members = useTeamStore((state) => state.members);
@@ -68,7 +68,20 @@ export const TeamBuilder = (): JSX.Element => {
                     Remove
                   </button>
                 </div>
-                <img src={member.sprite} alt={member.name} className="mx-auto my-4 h-28 w-28 object-contain" />
+                <div className="mx-auto my-4 h-32 w-32 flex items-center justify-center">
+                  <img 
+                    src={member.sprite} 
+                    alt={member.name}
+                    style={{ 
+                      imageRendering: 'crisp-edges',
+                      maxWidth: '100%',
+                      maxHeight: '100%',
+                      width: 'auto',
+                      height: 'auto',
+                      objectFit: 'contain'
+                    }} 
+                  />
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {member.types.map((type) => (
                     <span key={type} className="rounded-full px-2.5 py-1 text-xs font-bold text-slate-950" style={{ backgroundColor: getTypeColor(type) }}>

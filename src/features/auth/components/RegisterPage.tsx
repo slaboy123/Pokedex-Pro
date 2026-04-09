@@ -1,22 +1,22 @@
 import { FormEvent, useState } from 'react';
 
-interface LoginPageProps {
-  onLogin: (email: string, password: string) => Promise<boolean>;
-  onGoToRegister: () => void;
-  onGoToForgotPassword: () => void;
+interface RegisterPageProps {
+  onRegister: (email: string, password: string, nickname: string) => Promise<boolean>;
+  onGoToLogin: () => void;
   loading: boolean;
   error: string | null;
 }
 
-export const LoginPage = ({
-  onLogin,
-  onGoToRegister,
-  onGoToForgotPassword,
+export const RegisterPage = ({
+  onRegister,
+  onGoToLogin,
   loading,
   error,
-}: LoginPageProps): JSX.Element => {
+}: RegisterPageProps): JSX.Element => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [nickname, setNickname] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
 
   const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
@@ -27,13 +27,23 @@ export const LoginPage = ({
       return;
     }
 
-    if (password.trim().length < 6) {
+    if (nickname.trim().length < 3) {
+      setLocalError('O nickname precisa ter ao menos 3 caracteres.');
+      return;
+    }
+
+    if (password.length < 6) {
       setLocalError('A senha precisa ter ao menos 6 caracteres.');
       return;
     }
 
+    if (password !== confirmPassword) {
+      setLocalError('As senhas nao coincidem.');
+      return;
+    }
+
     setLocalError(null);
-    await onLogin(email.trim(), password);
+    await onRegister(email.trim(), password, nickname.trim());
   };
 
   return (
@@ -42,10 +52,22 @@ export const LoginPage = ({
 
       <section className="relative w-full max-w-md rounded-3xl border border-rose-300/20 bg-[#0d0708]/90 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-sm sm:p-8">
         <p className="text-xs uppercase tracking-[0.35em] text-rose-300/80">Pokedex Pro</p>
-        <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-100">Entrar</h1>
-        <p className="mt-2 text-sm text-slate-300">Acesse sua conta para montar time, batalhar e salvar progresso.</p>
+        <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-100">Criar Conta</h1>
+        <p className="mt-2 text-sm text-slate-300">Registre seu perfil para salvar progresso e jogar multiplayer.</p>
 
         <form className="mt-6 space-y-4" onSubmit={(event) => void submit(event)}>
+          <label className="block space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">Nickname</span>
+            <input
+              value={nickname}
+              onChange={(event) => setNickname(event.target.value)}
+              type="text"
+              autoComplete="nickname"
+              placeholder="Seu nome de treinador"
+              className="w-full rounded-2xl border border-rose-300/20 bg-[#090506] px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-rose-300/60 focus:shadow-[0_0_0_2px_rgba(251,113,133,0.2)]"
+            />
+          </label>
+
           <label className="block space-y-2">
             <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">Email</span>
             <input
@@ -64,8 +86,20 @@ export const LoginPage = ({
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               type="password"
-              autoComplete="current-password"
-              placeholder="••••••••"
+              autoComplete="new-password"
+              placeholder="Minimo 6 caracteres"
+              className="w-full rounded-2xl border border-rose-300/20 bg-[#090506] px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-rose-300/60 focus:shadow-[0_0_0_2px_rgba(251,113,133,0.2)]"
+            />
+          </label>
+
+          <label className="block space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">Confirmar senha</span>
+            <input
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              type="password"
+              autoComplete="new-password"
+              placeholder="Repita sua senha"
               className="w-full rounded-2xl border border-rose-300/20 bg-[#090506] px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-rose-300/60 focus:shadow-[0_0_0_2px_rgba(251,113,133,0.2)]"
             />
           </label>
@@ -76,28 +110,19 @@ export const LoginPage = ({
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-2xl bg-gradient-to-r from-rose-300 to-rose-400 px-4 py-3 text-sm font-extrabold uppercase tracking-[0.15em] text-[#21070b] transition hover:brightness-105"
+            className="w-full rounded-2xl bg-gradient-to-r from-rose-300 to-rose-400 px-4 py-3 text-sm font-extrabold uppercase tracking-[0.15em] text-[#21070b] transition hover:brightness-105 disabled:opacity-70"
           >
-            {loading ? 'Entrando...' : 'Entrar'}
+            {loading ? 'Criando...' : 'Registrar'}
           </button>
         </form>
 
-        <div className="mt-4 flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={onGoToForgotPassword}
-            className="text-sm font-semibold text-rose-200 underline-offset-4 transition hover:text-rose-100 hover:underline"
-          >
-            Esqueci minha senha
-          </button>
-          <button
-            type="button"
-            onClick={onGoToRegister}
-            className="text-sm font-semibold text-rose-200 underline-offset-4 transition hover:text-rose-100 hover:underline"
-          >
-            Criar nova conta
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onGoToLogin}
+          className="mt-4 w-full text-sm font-semibold text-rose-200 underline-offset-4 transition hover:text-rose-100 hover:underline"
+        >
+          Ja tenho conta
+        </button>
       </section>
     </main>
   );

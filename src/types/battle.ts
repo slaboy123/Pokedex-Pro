@@ -9,6 +9,7 @@ export interface BattleMove {
   category?: MoveCategory;
   power: number;
   accuracy: number;
+  pp: number | null;
   priority: number;
   effect: string;
   inflictsStatus?: NonVolatileStatus;
@@ -66,6 +67,17 @@ export interface BattleEvent {
   move?: BattleMove;
   damage?: number;
   nextHp?: number;
+  critical?: boolean;
+  effectiveness?: number;
   nextStatus?: NonVolatileStatus | null;
   tone?: BattleLogEntry['tone'];
+}
+
+export type BattleAction =
+  | { type: 'fight'; moveIndex: number }
+  | { type: 'switch'; targetIndex: number };
+
+export interface BattleSideState {
+  roster: BattleFighter[];
+  activeIndex: number;
 }

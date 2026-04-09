@@ -1,6 +1,6 @@
-import type { AppView } from '@/types/app';
-import { useFavoritesStore } from '@/store/favoritesStore';
-import { useTeamStore } from '@/store/teamStore';
+import type { AppView } from '../types/app';
+import { useFavoritesStore } from '../store/favoritesStore';
+import { useTeamStore } from '../store/teamStore';
 
 interface NavbarProps {
   view: AppView;

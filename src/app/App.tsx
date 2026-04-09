@@ -1,34 +1,29 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import type { AppView } from '@/types/app';
-import { Navbar } from '@/components/Navbar';
-import { ToastHost } from '@/components/ui/ToastHost';
-import { PokedexPage } from '@/features/pokedex/components/PokedexPage';
-import { TeamBuilder } from '@/features/team/components/TeamBuilder';
-import { BattleSimulator } from '@/features/battle/components/BattleSimulator';
-import { switchView } from '@/features/battle/navigation';
-import { LoginPage } from '@/features/auth/components/LoginPage';
-
-const AUTH_STORAGE_KEY = 'pokedex-pro-auth';
+import type { AppView } from '../types/app';
+import { Navbar } from '../components/Navbar';
+import { ToastHost } from '../components/ui/ToastHost';
+import { PokedexPage } from '../features/pokedex/components/PokedexPage';
+import { TeamBuilder } from '../features/team/components/TeamBuilder';
+import { BattleSimulator } from '../features/battle/components/BattleSimulator';
+import { getPersistedView, switchView } from '../features/battle/navigation';
+import { AuthGate } from '../features/auth/components/AuthGate';
+import { useAuth } from '../hooks/useAuth';
 
 export const App = (): JSX.Element => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => localStorage.getItem(AUTH_STORAGE_KEY) === '1');
-  const [view, setView] = useState<AppView>('pokedex');
+  const { isAuthenticated, signOut } = useAuth();
+  const [view, setView] = useState<AppView>(() => getPersistedView());
   const isBattleView = view === 'battle';
 
-  const handleLogin = (): void => {
-    localStorage.setItem(AUTH_STORAGE_KEY, '1');
-    setIsAuthenticated(true);
-  };
+  const handleLogin = (): void => {};
 
   const handleLogout = (): void => {
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-    setView('pokedex');
-    setIsAuthenticated(false);
+    void signOut();
+    switchView('pokedex', setView);
   };
 
   if (!isAuthenticated) {
-    return <LoginPage onLogin={handleLogin} />;
+    return <AuthGate onAuthenticated={handleLogin} />;
   }
 
   return (

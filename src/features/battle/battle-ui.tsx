@@ -1,14 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { getMoveByName, getPokemonDetailBundle } from '@/services/pokeapi';
-import { capitalize, cleanText, formatId } from '@/utils/pokemon';
 import type { AppView } from '@/types/app';
 import type { AnimationState, BattleAnimationController } from './battle-animations';
-import { animateHPBar, playAttackAnimation, playHitEffect, playSwitchAnimation, shakeSprite } from './battle-animations';
+import {
+  animateHPBar,
+  playAttackAnimation,
+  playHitEffect,
+  playHitStop,
+  playImpactFrame,
+  playSwitchAnimation,
+  shakeCamera,
+} from './battle-animations';
 import { resolveTurn } from './battle-engine';
 import { switchView } from './navigation';
 import { useTeamStore } from '@/store/teamStore';
 import { useToastStore } from '@/store/toastStore';
-import type { BattleEvent, BattleFighter, BattleLogEntry, BattleMove, NonVolatileStatus } from '@/types/battle';
+import type { BattleAction, BattleEvent, BattleFighter, BattleLogEntry, BattleMove, BattleSideState, NonVolatileStatus } from '@/types/battle';
+import { BattleField } from './components/BattleField';
+import { getMoveByName, getPokemonDetailBundle } from '@/services/pokeapi';
+import { capitalize, cleanText } from '@/utils/pokemon';
 
 interface BattleViewProps {
   onViewChange: (view: AppView) => void;
@@ -21,25 +30,24 @@ interface DisplayedHpState {
 
 type BattleDifficulty = 'easy' | 'medium' | 'nightmare';
 
-const DIFFICULTY_CONFIG: Record<BattleDifficulty, { label: string; description: string; level: number; statMultiplier: number; enemyNames: string[] }> = {
+type ActionPanel = 'fight' | 'switch';
+
+const DIFFICULTY_CONFIG: Record<BattleDifficulty, { label: string; level: number; statMultiplier: number; enemyNames: string[] }> = {
   easy: {
-    label: 'Facil',
-    description: '6 pokemons fracos',
+    label: 'Easy',
     level: 42,
-    statMultiplier: 0.9,
+    statMultiplier: 0.92,
     enemyNames: ['caterpie', 'weedle', 'pidgey', 'rattata', 'zubat', 'magikarp'],
   },
   medium: {
-    label: 'Medio',
-    description: '6 pokemons medianos',
+    label: 'Medium',
     level: 56,
     statMultiplier: 1.15,
     enemyNames: ['raichu', 'arcanine', 'gyarados', 'alakazam', 'machamp', 'gengar'],
   },
   nightmare: {
-    label: 'Pesadelo',
-    description: 'time de 6 lendarios super fortes',
-    level: 74,
+    label: 'Nightmare',
+    level: 72,
     statMultiplier: 1.45,
     enemyNames: ['mewtwo', 'lugia', 'rayquaza', 'dialga', 'groudon', 'kyogre'],
   },
@@ -80,6 +88,26 @@ const tuneEnemyFighter = (fighter: BattleFighter, level: number, statMultiplier:
   };
 };
 
+const tunePlayerToMaxLevel = (fighter: BattleFighter): BattleFighter => {
+  const level = 100;
+  const levelScale = level / 50;
+  const maxHp = Math.max(160, Math.round(fighter.maxHp * levelScale));
+
+  return {
+    ...fighter,
+    level,
+    maxHp,
+    currentHp: maxHp,
+    attack: Math.round(fighter.attack * levelScale),
+    defense: Math.round(fighter.defense * levelScale),
+    specialAttack: Math.round(fighter.specialAttack * levelScale),
+    specialDefense: Math.round(fighter.specialDefense * levelScale),
+    speed: Math.round(fighter.speed * levelScale),
+    status: null,
+    sleepTurns: 0,
+  };
+};
+
 const buildFighter = async (identifier: string | number): Promise<BattleFighter> => {
   const bundle = await getPokemonDetailBundle(identifier);
   const stats = Object.fromEntries(bundle.pokemon.stats.map((stat) => [stat.stat.name, stat.base_stat]));
@@ -100,6 +128,7 @@ const buildFighter = async (identifier: string | number): Promise<BattleFighter>
         category: mapCategory(move.damage_class?.name),
         power: move.power ?? 40,
         accuracy: move.accuracy ?? 100,
+        pp: move.pp ?? null,
         priority: move.priority,
         effect,
         inflictsStatus: infliction.status,
@@ -141,47 +170,35 @@ const byBatch = (events: BattleEvent[]): BattleEvent[][] => {
   return order.map((batchId) => map.get(batchId) ?? []);
 };
 
-const statusLabel = (status: NonVolatileStatus | null): string => {
-  if (!status) return 'OK';
-  return status.toUpperCase();
-};
-
 export const BattleView = ({ onViewChange }: BattleViewProps): JSX.Element => {
   const team = useTeamStore((state) => state.members);
   const pushToast = useToastStore((state) => state.pushToast);
 
   const [difficulty, setDifficulty] = useState<BattleDifficulty>('easy');
-  const [playerRoster, setPlayerRoster] = useState<BattleFighter[]>([]);
-  const [activePlayerIndex, setActivePlayerIndex] = useState(0);
-  const [enemyRoster, setEnemyRoster] = useState<BattleFighter[]>([]);
-  const [enemyIndex, setEnemyIndex] = useState(0);
-  const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(team[0]?.id ?? null);
-  const [player, setPlayer] = useState<BattleFighter | null>(null);
-  const [enemy, setEnemy] = useState<BattleFighter | null>(null);
-  const [round, setRound] = useState(1);
   const [phase, setPhase] = useState<'setup' | 'resolving' | 'player-turn' | 'finished'>('setup');
   const [winner, setWinner] = useState<'player' | 'enemy' | null>(null);
   const [processing, setProcessing] = useState(false);
-  const [showSwitch, setShowSwitch] = useState(false);
-  const [logEntries, setLogEntries] = useState<BattleLogEntry[]>([]);
+  const [round, setRound] = useState(1);
+  const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(team[0]?.id ?? null);
+  const [playerSide, setPlayerSide] = useState<BattleSideState | null>(null);
+  const [enemySide, setEnemySide] = useState<BattleSideState | null>(null);
+  const [selectedMoveIndex, setSelectedMoveIndex] = useState(0);
+  const [actionPanel, setActionPanel] = useState<ActionPanel>('fight');
   const [displayedHp, setDisplayedHp] = useState<DisplayedHpState>({ player: 0, enemy: 0 });
-  const displayedHpRef = useRef<DisplayedHpState>({ player: 0, enemy: 0 });
-
+  const [logEntries, setLogEntries] = useState<BattleLogEntry[]>([]);
   const [animationState, setAnimationState] = useState<AnimationState>({
     projectile: null,
     hitSide: null,
     shakingSide: null,
     fadingSide: null,
+    lungingSide: null,
+    camera: { x: 0, y: 0 },
+    impactFlash: false,
+    hitStop: false,
   });
 
   const logRef = useRef<HTMLDivElement>(null);
-  const battleQueueRef = useRef<BattleEvent[]>([]);
-
-  const selectedMember = useMemo(() => team.find((member) => member.id === selectedPlayerId) ?? null, [selectedPlayerId, team]);
-  const playerAliveCount = useMemo(() => playerRoster.filter((fighter) => fighter.currentHp > 0).length, [playerRoster]);
-  const enemyAliveCount = useMemo(() => enemyRoster.filter((fighter) => fighter.currentHp > 0).length, [enemyRoster]);
-
-  const difficultyPreset = DIFFICULTY_CONFIG[difficulty];
+  const displayedHpRef = useRef(displayedHp);
 
   useEffect(() => {
     if (selectedPlayerId === null && team[0]) {
@@ -199,21 +216,36 @@ export const BattleView = ({ onViewChange }: BattleViewProps): JSX.Element => {
     }
   }, [logEntries]);
 
+  const playerActive = useMemo(() => {
+    if (!playerSide) return null;
+    return playerSide.roster[playerSide.activeIndex] ?? null;
+  }, [playerSide]);
+
+  const enemyActive = useMemo(() => {
+    if (!enemySide) return null;
+    return enemySide.roster[enemySide.activeIndex] ?? null;
+  }, [enemySide]);
+
+  const selectedMove = playerActive?.moves[selectedMoveIndex] ?? playerActive?.moves[0] ?? null;
+
   const animationController: BattleAnimationController = {
     setAnimationState: (updater) => setAnimationState((prev) => updater(prev)),
-    updateDisplayedHp: (side, nextHp) => {
-      setDisplayedHp((prev) => ({ ...prev, [side]: Math.max(0, nextHp) }));
-    },
+    updateDisplayedHp: (side, nextHp) => setDisplayedHp((prev) => ({ ...prev, [side]: Math.max(0, nextHp) })),
     getDisplayedHp: (side) => displayedHpRef.current[side],
   };
 
   const pushLog = (text: string, tone: BattleLogEntry['tone'] = 'neutral'): void => {
-    setLogEntries((prev) => [...prev, { id: crypto.randomUUID(), text, tone }].slice(-40));
+    setLogEntries((prev) => [...prev, { id: crypto.randomUUID(), text, tone }].slice(-80));
   };
 
   const processEvent = async (event: BattleEvent): Promise<void> => {
     if (event.type === 'log' && event.text) {
       pushLog(event.text, event.tone ?? 'neutral');
+      return;
+    }
+
+    if (event.type === 'switch') {
+      await playSwitchAnimation(event.side, animationController);
       return;
     }
 
@@ -224,395 +256,315 @@ export const BattleView = ({ onViewChange }: BattleViewProps): JSX.Element => {
     }
 
     if (event.type === 'damage' && event.nextHp !== undefined) {
-      const side = event.side;
+      const target = event.side;
+      const targetFighter = target === 'player' ? playerActive : enemyActive;
+      const maxHp = Math.max(1, targetFighter?.maxHp ?? 100);
+      const damageRatio = Math.max(0, (event.damage ?? 0) / maxHp);
+      const intensity = event.critical ? 14 : damageRatio > 0.25 ? 9 : 5;
+      const hitStopDuration = event.critical ? 95 : 65;
+
       await Promise.all([
-        animateHPBar(side, event.nextHp, animationController),
-        playHitEffect(side, animationController),
-        shakeSprite(side, animationController),
+        playImpactFrame(animationController),
+        playHitStop(hitStopDuration, animationController),
+        playHitEffect(target, animationController),
+        shakeCamera(intensity, event.critical ? 230 : 170, animationController),
+        animateHPBar(target, event.nextHp, animationController, Math.max(0.5, damageRatio * 2.4)),
       ]);
-
-      if (side === 'player') {
-        setPlayer((prev) => (prev ? { ...prev, currentHp: event.nextHp ?? prev.currentHp } : prev));
-      } else {
-        setEnemy((prev) => (prev ? { ...prev, currentHp: event.nextHp ?? prev.currentHp } : prev));
-      }
       return;
-    }
-
-    if (event.type === 'status' && event.nextStatus !== undefined) {
-      const nextStatus = event.nextStatus ?? null;
-      if (event.side === 'player') {
-        setPlayer((prev) => (prev ? { ...prev, status: nextStatus } : prev));
-      } else {
-        setEnemy((prev) => (prev ? { ...prev, status: nextStatus } : prev));
-      }
-      return;
-    }
-
-    if (event.type === 'switch') {
-      await playSwitchAnimation(event.side, animationController);
     }
   };
 
   const runQueue = async (events: BattleEvent[]): Promise<void> => {
-    battleQueueRef.current = [...events];
     const batches = byBatch(events);
     for (const batch of batches) {
       await Promise.all(batch.map((event) => processEvent(event)));
-      battleQueueRef.current = battleQueueRef.current.filter((queued) => !batch.some((done) => done.id === queued.id));
     }
   };
 
   const startBattle = async (): Promise<void> => {
-    if (team.length === 0 || !selectedMember) {
-      pushToast({ title: 'Battle', message: 'Monte um time com ate 6 pokemons para usar na luta.', tone: 'warning' });
+    if (team.length === 0 || selectedPlayerId === null) {
+      pushToast({ title: 'Battle', message: 'Monte um time com até 6 Pokémon antes de iniciar.', tone: 'warning' });
       return;
     }
 
     setProcessing(true);
     setPhase('resolving');
     setWinner(null);
-    setLogEntries([]);
-    setShowSwitch(false);
-
-    const playerTeam = await Promise.all(team.map((member) => buildFighter(member.id)));
-    const enemyBases = await Promise.all(difficultyPreset.enemyNames.map((name) => buildFighter(name)));
-
-    const roster = enemyBases.map((fighter) => tuneEnemyFighter(fighter, difficultyPreset.level, difficultyPreset.statMultiplier));
-    const leadIndex = Math.max(
-      0,
-      playerTeam.findIndex((fighter) => fighter.id === selectedMember.id),
-    );
-    const leadPlayer = playerTeam[leadIndex] ?? playerTeam[0] ?? null;
-    const firstEnemy = roster[0] ?? null;
-
-    if (!leadPlayer || !firstEnemy) {
-      pushToast({ title: 'Battle', message: 'Nao foi possivel montar os times da batalha.', tone: 'warning' });
-      setPhase('setup');
-      setProcessing(false);
-      return;
-    }
-
-    setPlayerRoster(playerTeam);
-    setActivePlayerIndex(leadIndex);
-    setPlayer(leadPlayer);
-    setEnemyRoster(roster);
-    setEnemyIndex(0);
-    setEnemy(firstEnemy);
-    setDisplayedHp({ player: leadPlayer.currentHp, enemy: firstEnemy.currentHp });
     setRound(1);
+    setSelectedMoveIndex(0);
+    setActionPanel('fight');
+    setLogEntries([]);
+
+    const difficultyPreset = DIFFICULTY_CONFIG[difficulty];
+    const playerRosterRaw = await Promise.all(team.map((member) => buildFighter(member.id)));
+    const playerRoster = playerRosterRaw.map((fighter) => tunePlayerToMaxLevel(fighter));
+    const enemyRosterRaw = await Promise.all(difficultyPreset.enemyNames.map((name) => buildFighter(name)));
+    const enemyRoster = enemyRosterRaw.map((fighter) => tuneEnemyFighter(fighter, difficultyPreset.level, difficultyPreset.statMultiplier));
+
+    const leadPlayerIndex = Math.max(0, playerRoster.findIndex((fighter) => fighter.id === selectedPlayerId));
+    const nextPlayerSide: BattleSideState = { roster: playerRoster, activeIndex: leadPlayerIndex >= 0 ? leadPlayerIndex : 0 };
+    const nextEnemySide: BattleSideState = { roster: enemyRoster, activeIndex: 0 };
+
+    setPlayerSide(nextPlayerSide);
+    setEnemySide(nextEnemySide);
+
+    const playerLead = nextPlayerSide.roster[nextPlayerSide.activeIndex];
+    const enemyLead = nextEnemySide.roster[nextEnemySide.activeIndex];
+
+    setDisplayedHp({ player: playerLead.currentHp, enemy: enemyLead.currentHp });
+    pushLog(`Battle mode: ${difficultyPreset.label}`, 'warning');
+    pushLog(`${playerLead.name} entrou em campo!`, 'neutral');
+    pushLog(`${enemyLead.name} apareceu no lado inimigo!`, 'neutral');
+
     setPhase('player-turn');
-    pushLog(`Dificuldade: ${difficultyPreset.label} (${difficultyPreset.description}).`, 'warning');
-    pushLog(`${leadPlayer.name} entrou na arena como lider do seu time!`, 'neutral');
-    pushLog(`${firstEnemy.name} apareceu como 1/6 do time inimigo!`, 'neutral');
-    pushLog(`IA inimiga avaliou golpes por dano esperado e efetividade de tipo.`, 'neutral');
     setProcessing(false);
   };
 
-  const hasAvailableSwitch = (currentIndex: number, roster: BattleFighter[]): boolean =>
-    roster.some((fighter, index) => index !== currentIndex && fighter.currentHp > 0);
+  const executeAction = async (action: BattleAction): Promise<void> => {
+    if (!playerSide || !enemySide || !playerActive || !enemyActive || processing || phase !== 'player-turn') {
+      return;
+    }
 
-  const onUseMove = async (moveIndex: number): Promise<void> => {
-    if (!player || !enemy || processing || phase !== 'player-turn' || player.currentHp <= 0 || showSwitch) {
+    if (action.type === 'switch' && action.targetIndex === playerSide.activeIndex) {
       return;
     }
 
     setProcessing(true);
     setPhase('resolving');
 
-    const resolution = resolveTurn(player, enemy, moveIndex, round);
+    const resolution = resolveTurn(playerSide, enemySide, action, round);
     await runQueue(resolution.queue);
 
-    const updatedPlayerRoster = playerRoster.map((fighter, index) => (index === activePlayerIndex ? resolution.nextPlayer : fighter));
-    const updatedEnemyRoster = enemyRoster.map((fighter, index) => (index === enemyIndex ? resolution.nextEnemy : fighter));
-
-    setPlayerRoster(updatedPlayerRoster);
-    setEnemyRoster(updatedEnemyRoster);
-    setPlayer(resolution.nextPlayer);
-    setEnemy(resolution.nextEnemy);
+    setPlayerSide(resolution.nextPlayerSide);
+    setEnemySide(resolution.nextEnemySide);
     setRound(resolution.nextRound);
 
+    const nextPlayer = resolution.nextPlayerSide.roster[resolution.nextPlayerSide.activeIndex];
+    const nextEnemy = resolution.nextEnemySide.roster[resolution.nextEnemySide.activeIndex];
+
+    setDisplayedHp({
+      player: nextPlayer.currentHp,
+      enemy: nextEnemy.currentHp,
+    });
+
     if (resolution.winner) {
-      if (resolution.winner === 'player') {
-        const nextIndex = enemyIndex + 1;
-        const nextEnemy = updatedEnemyRoster[nextIndex];
-
-        pushLog(`${resolution.nextEnemy.name} desmaiou.`, 'success');
-
-        if (nextEnemy) {
-          await runQueue([
-            { id: crypto.randomUUID(), batchId: crypto.randomUUID(), type: 'switch', side: 'enemy' },
-            {
-              id: crypto.randomUUID(),
-              batchId: crypto.randomUUID(),
-              type: 'log',
-              side: 'enemy',
-              text: `${nextEnemy.name} entrou na arena! (${nextIndex + 1}/6)`,
-              tone: 'warning',
-            },
-          ]);
-
-          setEnemyIndex(nextIndex);
-          setEnemy(nextEnemy);
-          setDisplayedHp((prev) => ({ ...prev, enemy: nextEnemy.currentHp }));
-          setPhase('player-turn');
-        } else {
-          setWinner('player');
-          setPhase('finished');
-          pushLog('Time inimigo completo derrotado. Voce venceu a batalha!', 'success');
-        }
-      } else if (hasAvailableSwitch(activePlayerIndex, updatedPlayerRoster)) {
-        pushLog(`${resolution.nextPlayer.name} desmaiou. Escolha outro pokemon do seu time!`, 'warning');
-        setShowSwitch(true);
-        setPhase('player-turn');
-      } else {
-        setWinner('enemy');
-        setPhase('finished');
-        pushLog('Todos os seus pokemons desmaiaram. Voce perdeu.', 'danger');
-      }
+      setWinner(resolution.winner);
+      setPhase('finished');
+      pushLog(resolution.winner === 'player' ? 'Vitória! Você derrotou todo o time inimigo.' : 'Derrota! Seu time foi completamente derrotado.', resolution.winner === 'player' ? 'success' : 'danger');
     } else {
       setPhase('player-turn');
+      const hasBenchForPlayer = resolution.nextPlayerSide.roster.some((fighter, index) => index !== resolution.nextPlayerSide.activeIndex && fighter.currentHp > 0);
+      if (nextPlayer.currentHp <= 0 && hasBenchForPlayer) {
+        setActionPanel('switch');
+        pushLog(`${nextPlayer.name} desmaiou. Troque para continuar a luta.`, 'warning');
+      }
     }
 
     setProcessing(false);
   };
 
-  const onSwitchPokemon = async (nextIndex: number): Promise<void> => {
-    if (processing || phase !== 'player-turn') {
+  const onSelectSwitch = async (targetIndex: number): Promise<void> => {
+    if (!playerSide) return;
+    const target = playerSide.roster[targetIndex];
+    if (!target || target.currentHp <= 0) {
+      pushToast({ title: 'Switch', message: 'Esse Pokémon não pode entrar agora.', tone: 'warning' });
       return;
     }
 
-    const chosen = playerRoster[nextIndex];
-    if (!chosen) {
-      return;
-    }
-
-    if (chosen.currentHp <= 0) {
-      pushToast({ title: 'Battle', message: `${chosen.name} esta desmaiado e nao pode entrar.`, tone: 'warning' });
-      return;
-    }
-
-    if (nextIndex === activePlayerIndex && player && player.currentHp > 0) {
-      return;
-    }
-
-    setProcessing(true);
-    setShowSwitch(false);
-
-    await runQueue([
-      {
-        id: crypto.randomUUID(),
-        batchId: crypto.randomUUID(),
-        type: 'switch',
-        side: 'player',
-        text: player ? `${player.name}, volte!` : 'Troca de pokemon!',
-      },
-      { id: crypto.randomUUID(), batchId: crypto.randomUUID(), type: 'log', side: 'player', text: `${chosen.name}, eu escolho voce!`, tone: 'neutral' },
-    ]);
-
-    setPlayer(chosen);
-    setActivePlayerIndex(nextIndex);
-    setDisplayedHp((prev) => ({ ...prev, player: chosen.currentHp }));
-    setSelectedPlayerId(chosen.id);
-    setProcessing(false);
+    await executeAction({ type: 'switch', targetIndex });
+    setActionPanel('fight');
   };
 
-  const hpPercent = (current: number, max: number): number => Math.max(0, Math.min(100, (current / max) * 100));
+  const playerAlive = playerSide?.roster.filter((fighter) => fighter.currentHp > 0).length ?? 0;
+  const enemyAlive = enemySide?.roster.filter((fighter) => fighter.currentHp > 0).length ?? 0;
+  const resultTitle = winner === 'player' ? 'VITORIA' : winner === 'enemy' ? 'DERROTA' : null;
+  const resultMessage = winner === 'player'
+    ? 'Voce venceu a batalha. Seu time dominou o campo.'
+    : winner === 'enemy'
+      ? 'Seu time foi derrotado. Ajuste estrategia e tente novamente.'
+      : '';
 
   return (
-    <section className="battle-view fixed inset-0 z-50 flex flex-col bg-[radial-gradient(circle_at_top,rgba(143,61,79,0.24),transparent_36%),linear-gradient(180deg,#0b0908_0%,#15100c_100%)] text-[#f6ebd3]">
-      <header className="flex items-center justify-between border-b border-neon-green/25 px-4 py-3 md:px-6">
+    <section className="battle-view fixed inset-0 z-50 flex h-screen w-screen flex-col bg-[linear-gradient(180deg,#0e1316_0%,#131d1e_100%)] text-[#ecf6f1]">
+      <header className="flex items-center justify-between border-b border-[#2f4240] bg-[#111c1e]/95 px-4 py-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-neon-purple">Battle View</p>
-          <h1 className="text-2xl font-black text-[#f8edd7]">Arena Realtime 1v1</h1>
+          <p className="text-[11px] uppercase tracking-[0.2em] text-[#a4c8b7]">Competitive Arena</p>
+          <p className="text-sm font-bold text-[#d9eee4]">Turn {round} • {DIFFICULTY_CONFIG[difficulty].label}</p>
         </div>
         <button
           type="button"
           onClick={() => switchView('pokedex', onViewChange)}
-          className="rounded-full border border-neon-green/30 bg-black/20 px-4 py-2 text-sm font-bold text-[#f6ebd3] transition hover:border-neon-green/70 hover:bg-black/35"
+          className="rounded-md border border-[#3f5752] bg-[#1a2b2a] px-3 py-1.5 text-xs font-bold text-[#daf2e6] hover:bg-[#243937]"
         >
-          Voltar para Pokedex
+          Exit Battle
         </button>
       </header>
 
-      <div className="grid flex-1 gap-4 overflow-hidden p-4 md:grid-cols-[1.2fr_0.8fr] md:p-6">
-        <div className="grid gap-4 grid-rows-[auto_1fr_auto] overflow-hidden">
-          <div className="rpg-panel flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="rpg-tag">Turno</p>
-              <p className="text-2xl font-black text-[#f8edd7]">{round}</p>
-            </div>
-            <div className="grid gap-2 md:text-right text-sm text-[#dfcca8]">
-              <p>
-                Dificuldade: <span className="font-semibold text-[#f8edd7]">{difficultyPreset.label}</span>
-              </p>
-              <p>
-                Seu time: <span className="font-semibold text-[#f8edd7]">{playerAliveCount}/6 vivos</span>
-              </p>
-              <p>
-                Time inimigo: <span className="font-semibold text-[#f8edd7]">{enemyAliveCount}/6 vivos</span>
-              </p>
-              <p>Fase: {phase}</p>
-              <p>Estado: {processing ? 'resolvendo...' : 'pronto'}</p>
-            </div>
-          </div>
+      <div className="grid min-h-0 flex-1 gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3">
+          <div className="relative">
+            <BattleField
+              playerPokemon={playerActive}
+              enemyPokemon={enemyActive}
+              playerDisplayedHp={displayedHp.player}
+              enemyDisplayedHp={displayedHp.enemy}
+              animationState={animationState}
+            />
 
-          <div className="rpg-panel relative grid gap-4 overflow-hidden p-4 md:grid-cols-2">
-            {animationState.projectile ? (
-              <div className={`pointer-events-none absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full ${animationState.projectile.kind === 'fire' ? 'bg-rose-400 shadow-[0_0_20px_rgba(251,113,133,0.9)]' : 'bg-cyan-300 shadow-[0_0_20px_rgba(103,232,249,0.9)]'} ${animationState.projectile.from === 'player' ? 'left-[36%] animate-[ping_0.25s_ease-out_1]' : 'left-[58%] animate-[ping_0.25s_ease-out_1]'}`} />
+            {winner ? (
+              <div className="absolute inset-0 z-[80] bg-[#061013]/82 p-4">
+                <div className="pointer-events-none absolute left-1/2 top-1/2 w-full max-w-xl -translate-x-1/2 -translate-y-1/2 px-4">
+                  <div className={`pointer-events-auto w-full rounded-2xl border p-6 shadow-2xl ${winner === 'player' ? 'border-emerald-400/45 bg-[linear-gradient(180deg,#0f2a1f_0%,#10231f_100%)]' : 'border-rose-400/45 bg-[linear-gradient(180deg,#35151b_0%,#261218_100%)]'}`}>
+                    <p className={`text-xs font-bold uppercase tracking-[0.25em] ${winner === 'player' ? 'text-emerald-200' : 'text-rose-200'}`}>Resultado da batalha</p>
+                    <h2 className={`mt-2 text-3xl font-black uppercase ${winner === 'player' ? 'text-emerald-100' : 'text-rose-100'}`}>{resultTitle}</h2>
+                    <p className="mt-3 text-sm text-[#d7ece2]">{resultMessage}</p>
+
+                    <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => switchView('pokedex', onViewChange)}
+                        className="rounded-md border border-[#6f8b84] bg-[#1a3431] px-3 py-2 text-sm font-bold text-[#def4eb] transition hover:bg-[#244541]"
+                      >
+                        Voltar para Pokedex
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void startBattle();
+                        }}
+                        className={`rounded-md border px-3 py-2 text-sm font-bold transition ${winner === 'player' ? 'border-emerald-300/45 bg-emerald-300/20 text-emerald-100 hover:bg-emerald-300/28' : 'border-rose-300/45 bg-rose-300/20 text-rose-100 hover:bg-rose-300/28'}`}
+                      >
+                        Continuar lutando
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             ) : null}
-
-            <article className={`rounded-3xl border border-neon-green/25 bg-black/20 p-4 transition ${animationState.shakingSide === 'player' ? 'translate-x-1' : ''} ${animationState.hitSide === 'player' ? 'brightness-150' : ''} ${animationState.fadingSide === 'player' ? 'opacity-30' : 'opacity-100'}`}>
-              <p className="text-xs uppercase tracking-[0.22em] text-[#af9a74]">Player</p>
-              <h2 className="mt-1 text-xl font-bold text-[#f8edd7]">{player?.name ?? '---'}</h2>
-              <p className="text-xs text-[#ccb894]">{player ? formatId(player.id) : ''}</p>
-              <div className="mt-3 rounded-2xl bg-black/25 p-3">
-                {player ? <img src={player.sprite} alt={player.name} className="mx-auto h-32 w-32 object-contain" /> : null}
-              </div>
-              <div className="mt-3">
-                <div className="flex items-center justify-between text-xs text-[#d7c49e]">
-                  <span>HP</span>
-                  <span>{Math.max(0, displayedHp.player)}/{player?.maxHp ?? 0}</span>
-                </div>
-                <div className="mt-1 h-3 overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full rounded-full bg-neon-green transition-[width] duration-200" style={{ width: `${player ? hpPercent(displayedHp.player, player.maxHp) : 0}%` }} />
-                </div>
-                <p className="mt-2 text-xs text-[#ccb894]">Status: {statusLabel(player?.status ?? null)}</p>
-              </div>
-            </article>
-
-            <article className={`rounded-3xl border border-neon-green/25 bg-black/20 p-4 transition ${animationState.shakingSide === 'enemy' ? '-translate-x-1' : ''} ${animationState.hitSide === 'enemy' ? 'brightness-150' : ''} ${animationState.fadingSide === 'enemy' ? 'opacity-30' : 'opacity-100'}`}>
-              <p className="text-xs uppercase tracking-[0.22em] text-[#af9a74]">Enemy AI</p>
-              <h2 className="mt-1 text-xl font-bold text-[#f8edd7]">{enemy?.name ?? '---'}</h2>
-              <p className="text-xs text-[#ccb894]">{enemy ? formatId(enemy.id) : ''}</p>
-              <div className="mt-3 rounded-2xl bg-black/25 p-3">
-                {enemy ? <img src={enemy.sprite} alt={enemy.name} className="mx-auto h-32 w-32 object-contain" /> : null}
-              </div>
-              <div className="mt-3">
-                <div className="flex items-center justify-between text-xs text-[#d7c49e]">
-                  <span>HP</span>
-                  <span>{Math.max(0, displayedHp.enemy)}/{enemy?.maxHp ?? 0}</span>
-                </div>
-                <div className="mt-1 h-3 overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full rounded-full bg-neon-purple transition-[width] duration-200" style={{ width: `${enemy ? hpPercent(displayedHp.enemy, enemy.maxHp) : 0}%` }} />
-                </div>
-                <p className="mt-2 text-xs text-[#ccb894]">Status: {statusLabel(enemy?.status ?? null)}</p>
-              </div>
-            </article>
           </div>
 
-          <div className="rpg-panel p-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-[#f8edd7]">Acoes</h3>
-              <div className="flex gap-2">
+          <section className="rounded-2xl border border-[#34514c] bg-[#132224]/95 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs font-semibold text-[#a7cabd]">
+                Player Team {playerAlive}/6 • Enemy Team {enemyAlive}/6 • Phase {phase}
+              </div>
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => void startBattle()}
                   disabled={processing}
-                  className="rounded-full border border-neon-green bg-neon-green px-4 py-2 text-xs font-bold text-[#24190e] disabled:opacity-50"
+                  className="rounded-md border border-[#4d6c65] bg-[#27423f] px-3 py-1.5 text-xs font-bold disabled:opacity-50"
                 >
-                  Iniciar
+                  Start
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowSwitch((value) => !value)}
-                  disabled={phase !== 'player-turn' || processing}
-                  className="rounded-full border border-neon-green/35 bg-black/20 px-4 py-2 text-xs font-bold text-[#f6ebd3] disabled:opacity-50"
+                  onClick={() => setActionPanel('fight')}
+                  disabled={phase !== 'player-turn' || processing || winner !== null}
+                  className={`rounded-md border px-3 py-1.5 text-xs font-bold disabled:opacity-50 ${actionPanel === 'fight' ? 'border-[#89b2a4] bg-[#30544e]' : 'border-[#4d6c65] bg-[#1a2f2c]'}`}
                 >
-                  Trocar Pokemon
+                  Fight
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActionPanel('switch')}
+                  disabled={phase !== 'player-turn' || processing || winner !== null}
+                  className={`rounded-md border px-3 py-1.5 text-xs font-bold disabled:opacity-50 ${actionPanel === 'switch' ? 'border-[#89b2a4] bg-[#30544e]' : 'border-[#4d6c65] bg-[#1a2f2c]'}`}
+                >
+                  Switch
                 </button>
               </div>
             </div>
 
-            <div className="mt-3 grid gap-2 md:grid-cols-3">
+            <div className="mt-3 flex flex-wrap gap-2">
               {(Object.entries(DIFFICULTY_CONFIG) as Array<[BattleDifficulty, (typeof DIFFICULTY_CONFIG)[BattleDifficulty]]>).map(([key, config]) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => setDifficulty(key)}
-                  disabled={processing || phase === 'player-turn' || phase === 'resolving'}
-                  className={`rounded-2xl border px-3 py-2 text-left text-xs transition disabled:opacity-40 ${difficulty === key ? 'border-neon-green bg-neon-green/20 text-[#f8edd7]' : 'border-neon-green/20 bg-black/20 text-[#f6ebd3] hover:border-neon-green/55'}`}
+                  disabled={phase !== 'setup' || processing}
+                  className={`rounded-md border px-3 py-1 text-xs font-semibold disabled:opacity-45 ${difficulty === key ? 'border-[#9bc7b7] bg-[#2f4b48]' : 'border-[#4d6c65] bg-[#172b2a]'}`}
                 >
-                  <p className="font-bold">{config.label}</p>
-                  <p className="mt-1 text-[11px] text-[#ccb894]">{config.description}</p>
+                  {config.label}
                 </button>
               ))}
             </div>
 
             {phase === 'setup' ? (
-              <div className="mt-3 grid gap-2 md:grid-cols-3">
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 {team.map((member) => (
                   <button
                     key={member.id}
                     type="button"
                     onClick={() => setSelectedPlayerId(member.id)}
-                    className={`rounded-2xl border px-3 py-2 text-left text-xs transition ${selectedPlayerId === member.id ? 'border-neon-green bg-neon-green/20 text-[#f8edd7]' : 'border-neon-green/20 bg-black/20 text-[#f6ebd3] hover:border-neon-green/55'}`}
+                    className={`rounded-md border px-3 py-2 text-left text-xs ${selectedPlayerId === member.id ? 'border-[#9bc7b7] bg-[#2f4b48]' : 'border-[#4d6c65] bg-[#172b2a]'}`}
                   >
-                    <p className="font-bold">{member.name}</p>
-                    <p className="mt-1 text-[11px] text-[#ccb894]">Clique para definir como lider inicial</p>
+                    <p className="font-bold uppercase">{member.name}</p>
+                    <p className="mt-1 text-[11px] text-[#9ebcb1]">Lead Pokémon</p>
                   </button>
                 ))}
               </div>
             ) : null}
 
-            {showSwitch ? (
-              <div className="mt-3 grid gap-2 md:grid-cols-3">
-                {playerRoster.map((fighter, index) => (
+            {actionPanel === 'fight' ? (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {(playerActive?.moves ?? []).map((move, index) => (
+                  <button
+                    key={`${move.name}-${index}`}
+                    type="button"
+                    disabled={phase !== 'player-turn' || processing || winner !== null || (playerActive?.currentHp ?? 0) <= 0}
+                    onClick={() => {
+                      setSelectedMoveIndex(index);
+                      void executeAction({ type: 'fight', moveIndex: index });
+                    }}
+                    className={`rounded-md border px-3 py-2 text-left text-xs disabled:opacity-50 ${selectedMoveIndex === index ? 'border-[#9bc7b7] bg-[#2f4b48]' : 'border-[#4d6c65] bg-[#172b2a]'}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold uppercase">{move.name}</span>
+                      <span className="rounded border border-[#617a73] px-1.5 py-0.5 text-[10px] uppercase">{move.type}</span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-[#9ebcb1]">Power {move.power} • Accuracy {move.accuracy} • {move.category}</p>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                {(playerSide?.roster ?? []).map((fighter, index) => (
                   <button
                     key={`${fighter.id}-${index}`}
                     type="button"
-                    onClick={() => void onSwitchPokemon(index)}
-                    disabled={fighter.currentHp <= 0 || index === activePlayerIndex}
-                    className={`rounded-2xl border px-3 py-2 text-left text-xs transition ${fighter.currentHp <= 0 ? 'border-rose-500/30 bg-rose-900/20 text-rose-200 opacity-60' : index === activePlayerIndex ? 'border-neon-green bg-neon-green/20 text-[#f8edd7]' : 'border-neon-green/20 bg-black/20 text-[#f6ebd3] hover:border-neon-green/55'}`}
+                    disabled={fighter.currentHp <= 0 || index === playerSide?.activeIndex || phase !== 'player-turn' || processing}
+                    onClick={() => void onSelectSwitch(index)}
+                    className={`rounded-md border px-3 py-2 text-left text-xs disabled:opacity-45 ${index === playerSide?.activeIndex ? 'border-[#89b2a4] bg-[#2f4b48]' : 'border-[#4d6c65] bg-[#172b2a]'}`}
                   >
-                    <p className="font-bold">{fighter.name}</p>
-                    <p className="mt-1 text-[11px] text-[#ccb894]">HP {fighter.currentHp}/{fighter.maxHp}</p>
+                    <p className="font-bold uppercase">{fighter.name}</p>
+                    <p className="mt-1 text-[11px] text-[#9ebcb1]">HP {fighter.currentHp}/{fighter.maxHp}</p>
                   </button>
                 ))}
               </div>
-            ) : null}
+            )}
 
-            <div className="mt-3 grid gap-2 md:grid-cols-2">
-              {(player?.moves ?? []).map((move, index) => (
-                <button
-                  key={move.name}
-                  type="button"
-                  onClick={() => void onUseMove(index)}
-                  disabled={phase !== 'player-turn' || processing || !player || !enemy || winner !== null || player.currentHp <= 0 || showSwitch}
-                  className="rounded-2xl border border-neon-green/20 bg-black/20 p-3 text-left transition hover:border-neon-green/60 disabled:opacity-50"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold text-[#f8edd7]">{move.name}</span>
-                    <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] uppercase text-[#dfcca8]">{move.type}</span>
-                  </div>
-                  <p className="mt-1 text-xs text-[#ccb894]">{move.category} | Pow {move.power} | Acc {move.accuracy}</p>
-                </button>
-              ))}
+            <div className="mt-3 rounded-md border border-[#4d6c65] bg-[#152a28] px-3 py-2 text-[11px] text-[#c4dfd4]">
+              {selectedMove ? `${selectedMove.name}: ${selectedMove.effect}` : 'Start the battle to unlock actions.'}
             </div>
-          </div>
+          </section>
         </div>
 
-        <aside className="rpg-panel flex min-h-0 flex-col p-4">
-          <h3 className="text-lg font-bold text-[#f8edd7]">Battle Log</h3>
-          <p className="mt-1 text-xs text-[#ccb894]">Atualizacao em tempo real estilo Showdown</p>
+        <aside className="flex min-h-0 flex-col rounded-2xl border border-[#34514c] bg-[#132224]/95 p-3">
+          <h3 className="text-sm font-black uppercase text-[#d7eee3]">Battle Log</h3>
+          <p className="mt-1 text-[11px] text-[#9dbeb2]">Atualização em tempo real</p>
           <div ref={logRef} className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
             {logEntries.length > 0 ? logEntries.map((entry) => (
-              <p key={entry.id} className={`rounded-xl px-3 py-2 text-sm ${entry.tone === 'success' ? 'bg-emerald-500/20 text-emerald-100' : entry.tone === 'warning' ? 'bg-amber-500/20 text-amber-100' : entry.tone === 'danger' ? 'bg-rose-500/20 text-rose-100' : 'bg-white/5 text-[#f6ebd3]'}`}>
+              <p key={entry.id} className={`rounded-md border px-2.5 py-2 text-xs ${entry.tone === 'success' ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200' : entry.tone === 'warning' ? 'border-amber-400/40 bg-amber-400/10 text-amber-200' : entry.tone === 'danger' ? 'border-rose-400/40 bg-rose-400/10 text-rose-200' : 'border-[#44655f] bg-[#19302d] text-[#d8ece4]'}`}>
                 {entry.text}
               </p>
             )) : (
-              <p className="text-sm text-[#ccb894]">Inicie a batalha para gerar eventos.</p>
+              <p className="text-xs text-[#9dbeb2]">Nenhum evento ainda.</p>
             )}
           </div>
-
-          {winner ? (
-            <div className={`mt-3 rounded-2xl border p-3 ${winner === 'player' ? 'border-emerald-500/40 bg-emerald-500/15' : 'border-rose-500/40 bg-rose-500/15'}`}>
-              <p className="text-lg font-black text-[#f8edd7]">{winner === 'player' ? 'Vitoria' : 'Derrota'}</p>
-              <p className="text-sm text-[#e7d4ae]">{winner === 'player' ? 'Combate encerrado com sucesso.' : 'Tente outra combinacao de moves e troca.'}</p>
-            </div>
-          ) : null}
         </aside>
       </div>
+
     </section>
   );
 };

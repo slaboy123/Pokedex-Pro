@@ -4,6 +4,7 @@ import { getAbilityByName, getMoveByName, getPokemonDetailBundle, getTypeByName 
 import type { PokemonDetailBundle, PokemonSummary, TypeEffectiveness } from '@/types/pokemon';
 import type { BattleMove } from '@/types/battle';
 import { buildEffectiveness, capitalize, cleanText, formatId, toTitleCase } from '@/utils/pokemon';
+import { getAnimatedSpriteUrl } from '@/utils/animatedSprites';
 import { Modal } from '@/components/ui/Modal';
 import { StatBars } from '@/features/pokemon/components/StatBars';
 import { EvolutionTree } from '@/features/pokemon/components/EvolutionTree';
@@ -97,6 +98,7 @@ export const PokemonDetailsModal = ({ pokemon, onClose }: PokemonDetailsModalPro
             type: move.type.name,
             power: move.power ?? 40,
             accuracy: move.accuracy ?? 100,
+            pp: move.pp ?? null,
             priority: move.priority,
             effect: cleanText(move.effect_entries.find((entry) => entry.language.name === 'en')?.short_effect ?? 'A reliable move.'),
           } satisfies BattleMove;
@@ -185,11 +187,25 @@ export const PokemonDetailsModal = ({ pokemon, onClose }: PokemonDetailsModalPro
               </div>
 
               <motion.div className="mt-5 rounded-3xl border border-neon-purple/25 bg-black/20 p-6" layout>
-                <img
-                  src={shiny ? bundle.summary.shinySprite : bundle.summary.sprite}
-                  alt={bundle.summary.name}
-                  className="mx-auto h-56 w-56 object-contain drop-shadow-[0_24px_40px_rgba(0,0,0,0.45)]"
-                />
+                <div className="mx-auto h-56 w-56 flex items-center justify-center">
+                  <img
+                    src={getAnimatedSpriteUrl(bundle.summary.name, shiny)}
+                    alt={bundle.summary.name}
+                    className="drop-shadow-[0_24px_40px_rgba(0,0,0,0.45)]"
+                    style={{ 
+                      imageRendering: 'crisp-edges',
+                      maxWidth: '100%',
+                      maxHeight: '100%',
+                      width: 'auto',
+                      height: 'auto',
+                      objectFit: 'contain'
+                    }}
+                    onError={(e) => {
+                      // Fallback para sprite estática se animada falhar
+                      (e.target as HTMLImageElement).src = shiny ? bundle.summary.shinySprite : bundle.summary.sprite;
+                    }}
+                  />
+                </div>
               </motion.div>
 
               <div className="mt-4 flex flex-wrap gap-3">
