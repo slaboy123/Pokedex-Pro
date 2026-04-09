@@ -12,6 +12,7 @@ dist-node/
 .env
 .env.*
 !.env.example
+.supabase/
 
 # Editor settings
 .vscode/
