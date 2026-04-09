@@ -187,12 +187,12 @@ export const PokemonDetailsModal = ({ pokemon, onClose }: PokemonDetailsModalPro
               </div>
 
               <motion.div className="mt-5 rounded-3xl border border-neon-purple/25 bg-black/20 p-6" layout>
-                <div className="mx-auto h-56 w-56 flex items-center justify-center">
+                <div className="mx-auto flex items-center justify-center" style={{ width: 192, height: 192 }}>
                   <img
                     src={getAnimatedSpriteUrl(bundle.summary.name, shiny)}
                     alt={bundle.summary.name}
                     className="drop-shadow-[0_24px_40px_rgba(0,0,0,0.45)]"
-                    style={{ 
+                    style={{
                       imageRendering: 'crisp-edges',
                       maxWidth: '100%',
                       maxHeight: '100%',

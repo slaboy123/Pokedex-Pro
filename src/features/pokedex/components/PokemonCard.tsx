@@ -17,6 +17,7 @@ export const PokemonCard = ({ pokemon, onSelect, onToggleFavorite, onAddToTeam, 
   const [shiny, setShiny] = useState(false);
   const [hoverSprite, setHoverSprite] = useState<string | null>(null);
   const [hovering, setHovering] = useState(false);
+  const spriteSize = 160;
 
   const sprite = hovering && hoverSprite ? hoverSprite : shiny ? pokemon.shinySprite : pokemon.sprite;
 
@@ -75,7 +76,7 @@ export const PokemonCard = ({ pokemon, onSelect, onToggleFavorite, onAddToTeam, 
           </button>
         </div>
 
-        <div className="mt-4 flex items-center justify-center rounded-2xl border border-rose-300/25 bg-black/25 p-4 h-32 w-32 mx-auto">
+        <div className="mx-auto mt-4 flex items-center justify-center rounded-2xl border border-rose-300/25 bg-black/25 p-4" style={{ width: spriteSize, height: spriteSize }}>
           <img
             src={sprite}
             alt={pokemon.name}

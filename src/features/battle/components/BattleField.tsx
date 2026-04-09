@@ -42,14 +42,14 @@ const PokemonSprite = ({
 
   return (
     <div
-      className="transition-all duration-100 flex items-center justify-center"
+      className="flex items-center justify-center transition-all duration-100"
       style={{
         transform: `translate3d(${shakeOffset.x + lungeOffset}px, ${shakeOffset.y}px, 0) scale(${scale})`,
         filter: `brightness(${brightness})`,
         opacity: isFading ? 0.2 : 1,
         zIndex,
-        width: spriteSize,
-        height: spriteSize,
+        width: `${spriteSize}px`,
+        height: `${spriteSize}px`,
       }}
     >
       <img
@@ -59,7 +59,7 @@ const PokemonSprite = ({
         }}
         alt={name || `Pokemon ${pokemonId}`}
         className={`pokemon-sprite select-none ${side === 'enemy' ? 'scale-x-[-1] enemy-pokemon' : 'player-pokemon'}`}
-        style={{ 
+        style={{
           imageRendering: 'crisp-edges',
           maxWidth: '100%',
           maxHeight: '100%',
@@ -95,6 +95,8 @@ const statusLabel = (status: NonVolatileStatus | null): string => {
   if (status === 'burn') return 'BRN';
   return 'SLP';
 };
+
+const forestBattleBackground = 'https://preview.redd.it/d9spuwer2c491.png?width=1050&format=png&auto=webp&s=9ca8c75c63da9f8bb134e955d73e2770d073375e';
 
 export const BattleField = ({
   playerPokemon,
@@ -163,11 +165,17 @@ export const BattleField = ({
 
   return (
     <section
-      className="battlefield relative h-full min-h-[360px] overflow-hidden rounded-2xl border border-[#4f5c53] bg-[radial-gradient(circle_at_70%_20%,#d8eef8_0%,#c5e7da_35%,#a9cfb5_62%,#7f9d84_100%)]"
+      className="battlefield relative h-full min-h-[360px] overflow-hidden rounded-2xl border border-[#4f5c53] bg-[#33543a]"
       style={{
         transform: `translate3d(${animationState.camera.x}px, ${animationState.camera.y}px, 0)`,
       }}
     >
+      <img
+        src={forestBattleBackground}
+        alt="Forest battle background"
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+      />
+
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_80%,rgba(255,255,255,0.28),transparent_52%)]" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[42%] bg-[linear-gradient(180deg,rgba(122,163,114,0)_0%,rgba(98,132,90,0.8)_68%,rgba(72,96,66,0.95)_100%)]" />
 
@@ -200,7 +208,7 @@ export const BattleField = ({
       </div>
 
       <div className="absolute inset-0 z-10">
-        <div className="absolute right-[18%] top-[14%]">
+        <div className="absolute right-[18%] top-[18%]">
           {enemyPokemon ? (
             <PokemonSprite
               src={enemySprite ?? enemyPokemon.sprite}

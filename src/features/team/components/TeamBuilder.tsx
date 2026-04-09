@@ -68,7 +68,7 @@ export const TeamBuilder = (): JSX.Element => {
                     Remove
                   </button>
                 </div>
-                <div className="mx-auto my-4 h-32 w-32 flex items-center justify-center">
+                <div className="mx-auto my-4 flex items-center justify-center" style={{ width: 160, height: 160 }}>
                   <img 
                     src={member.sprite} 
                     alt={member.name}
