@@ -383,6 +383,7 @@ export const BattleView = ({ onViewChange }: BattleViewProps): JSX.Element => {
     : winner === 'enemy'
       ? 'Seu time foi derrotado. Ajuste estrategia e tente novamente.'
       : '';
+  const mobileRecentLog = logEntries.slice(-3);
 
   return (
     <section className="battle-view fixed inset-0 z-50 flex h-[100dvh] min-h-[100dvh] w-screen flex-col bg-[linear-gradient(180deg,#0e1316_0%,#131d1e_100%)] text-[#ecf6f1]">
@@ -400,9 +401,9 @@ export const BattleView = ({ onViewChange }: BattleViewProps): JSX.Element => {
         </button>
       </header>
 
-      <div className="battle-shell grid min-h-0 flex-1 gap-2 p-2 sm:gap-3 sm:p-3 lg:grid-cols-[minmax(0,1fr)_20rem] lg:p-4">
-        <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-2 sm:gap-3">
-          <div className="relative">
+      <div className="battle-shell battle-shell-mobile grid min-h-0 flex-1 gap-2 p-2 sm:gap-3 sm:p-3 lg:grid-cols-[minmax(0,1fr)_20rem] lg:p-4">
+        <div className="battle-main-pane grid min-h-0 [grid-template-rows:minmax(0,1fr)_auto] gap-2 sm:gap-3">
+          <div className="relative min-h-0">
             <BattleField
               playerPokemon={playerActive}
               enemyPokemon={enemyActive}
@@ -443,17 +444,17 @@ export const BattleView = ({ onViewChange }: BattleViewProps): JSX.Element => {
             ) : null}
           </div>
 
-          <section className="battle-controls rounded-2xl border border-[#34514c] bg-[#132224]/95 p-2.5 sm:p-3">
+          <section className="battle-controls min-h-0 overflow-y-auto rounded-2xl border border-[#34514c] bg-[#132224]/95 p-2.5 sm:p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="text-[11px] font-semibold text-[#a7cabd] sm:text-xs">
                 Player Team {playerAlive}/6 • Enemy Team {enemyAlive}/6 • Phase {phase}
               </div>
-              <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+              <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
                 <button
                   type="button"
                   onClick={() => void startBattle()}
                   disabled={processing}
-                  className="min-h-11 rounded-md border border-[#4d6c65] bg-[#27423f] px-3 py-1.5 text-xs font-bold disabled:opacity-50"
+                  className="col-span-2 min-h-11 rounded-md border border-[#4d6c65] bg-[#27423f] px-3 py-1.5 text-xs font-bold disabled:opacity-50 sm:col-span-1"
                 >
                   Start
                 </button>
@@ -523,7 +524,7 @@ export const BattleView = ({ onViewChange }: BattleViewProps): JSX.Element => {
                       <span className="font-bold uppercase">{move.name}</span>
                       <span className="rounded border border-[#617a73] px-1.5 py-0.5 text-[10px] uppercase">{move.type}</span>
                     </div>
-                    <p className="mt-1 text-[11px] text-[#9ebcb1]">Power {move.power} • Accuracy {move.accuracy} • {move.category}</p>
+                    <p className="mt-1 hidden text-[11px] text-[#9ebcb1] sm:block">Power {move.power} • Accuracy {move.accuracy} • {move.category}</p>
                   </button>
                 ))}
               </div>
@@ -547,10 +548,23 @@ export const BattleView = ({ onViewChange }: BattleViewProps): JSX.Element => {
             <div className="mt-3 rounded-md border border-[#4d6c65] bg-[#152a28] px-3 py-2 text-[11px] text-[#c4dfd4]">
               {selectedMove ? `${selectedMove.name}: ${selectedMove.effect}` : 'Start the battle to unlock actions.'}
             </div>
+
+            <div className="mt-3 space-y-2 lg:hidden">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9dbeb2]">Battle log (mobile)</p>
+              <div className="space-y-2">
+                {mobileRecentLog.length > 0 ? mobileRecentLog.map((entry) => (
+                  <p key={entry.id} className={`rounded-md border px-2 py-1.5 text-[11px] ${entry.tone === 'success' ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200' : entry.tone === 'warning' ? 'border-amber-400/40 bg-amber-400/10 text-amber-200' : entry.tone === 'danger' ? 'border-rose-400/40 bg-rose-400/10 text-rose-200' : 'border-[#44655f] bg-[#19302d] text-[#d8ece4]'}`}>
+                    {entry.text}
+                  </p>
+                )) : (
+                  <p className="text-xs text-[#9dbeb2]">Nenhum evento ainda.</p>
+                )}
+              </div>
+            </div>
           </section>
         </div>
 
-        <aside className="battle-log-pane order-last flex min-h-0 max-h-44 flex-col rounded-2xl border border-[#34514c] bg-[#132224]/95 p-2.5 sm:max-h-52 sm:p-3 lg:order-none lg:max-h-none">
+        <aside className="battle-log-pane hidden min-h-0 flex-col rounded-2xl border border-[#34514c] bg-[#132224]/95 p-3 lg:flex">
           <h3 className="text-xs font-black uppercase text-[#d7eee3] sm:text-sm">Battle Log</h3>
           <p className="mt-1 text-[10px] text-[#9dbeb2] sm:text-[11px]">Atualização em tempo real</p>
           <div ref={logRef} className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 sm:mt-3">

@@ -28,7 +28,7 @@ export const PokemonGrid = ({
 }: PokemonGridProps): JSX.Element => {
   if (loading) {
     return (
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 min-[560px]:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1700px]:grid-cols-6">
         {Array.from({ length: 12 }).map((_, index) => (
           <SkeletonCard key={index} />
         ))}
@@ -38,7 +38,7 @@ export const PokemonGrid = ({
 
   return (
     <div className="space-y-5 md:space-y-6">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 min-[560px]:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1700px]:grid-cols-6">
         {items.map((pokemon) => (
           <PokemonCard
             key={pokemon.id}
