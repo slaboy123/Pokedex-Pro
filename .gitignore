@@ -4,6 +4,7 @@ node_modules/
 # Build outputs
 dist/
 dist-node/
+.vite/
 
 # TypeScript cache
 *.tsbuildinfo
