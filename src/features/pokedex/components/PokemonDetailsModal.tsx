@@ -60,9 +60,34 @@ export const PokemonDetailsModal = ({ pokemon, onClose }: PokemonDetailsModalPro
   const [moves, setMoves] = useState<BattleMove[]>([]);
   const [abilityDescriptions, setAbilityDescriptions] = useState<Record<string, string>>({});
   const [shiny, setShiny] = useState(false);
+  const [preferStaticSprites, setPreferStaticSprites] = useState(false);
   const toggleFavorite = useFavoritesStore((state) => state.toggleFavorite);
   const addMember = useTeamStore((state) => state.addMember);
   const pushToast = useToastStore((state) => state.pushToast);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const viewportMedia = window.matchMedia('(max-width: 767px)');
+    const motionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    const update = (): void => {
+      const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+      const saveData = Boolean(connection?.saveData);
+      setPreferStaticSprites(viewportMedia.matches || motionMedia.matches || saveData);
+    };
+
+    update();
+    viewportMedia.addEventListener('change', update);
+    motionMedia.addEventListener('change', update);
+
+    return () => {
+      viewportMedia.removeEventListener('change', update);
+      motionMedia.removeEventListener('change', update);
+    };
+  }, []);
 
   useEffect(() => {
     if (!pokemon) {
@@ -142,6 +167,18 @@ export const PokemonDetailsModal = ({ pokemon, onClose }: PokemonDetailsModalPro
     return findEvolutionNode(bundle.evolutionChain.chain, bundle.summary.name.toLowerCase());
   }, [bundle]);
 
+  const displaySprite = useMemo(() => {
+    if (!bundle) {
+      return '';
+    }
+
+    if (preferStaticSprites) {
+      return shiny ? bundle.summary.shinySprite : bundle.summary.sprite;
+    }
+
+    return getAnimatedSpriteUrl(bundle.summary.name, shiny);
+  }, [bundle, preferStaticSprites, shiny]);
+
   const handleFavorite = (): void => {
     if (!pokemon) {
       return;
@@ -186,12 +223,14 @@ export const PokemonDetailsModal = ({ pokemon, onClose }: PokemonDetailsModalPro
                 </div>
               </div>
 
-              <motion.div className="mt-5 rounded-3xl border border-neon-purple/25 bg-black/20 p-6" layout>
-                <div className="mx-auto flex items-center justify-center" style={{ width: 192, height: 192 }}>
+              <motion.div className="mt-5 rounded-3xl border border-neon-purple/25 bg-black/20 p-4 sm:p-6" layout>
+                <div className="mx-auto flex aspect-square w-full max-w-[10rem] items-center justify-center sm:max-w-[12rem]">
                   <img
-                    src={getAnimatedSpriteUrl(bundle.summary.name, shiny)}
+                    src={displaySprite}
                     alt={bundle.summary.name}
                     className="drop-shadow-[0_24px_40px_rgba(0,0,0,0.45)]"
+                    loading="lazy"
+                    decoding="async"
                     style={{
                       imageRendering: 'crisp-edges',
                       maxWidth: '100%',
@@ -212,21 +251,21 @@ export const PokemonDetailsModal = ({ pokemon, onClose }: PokemonDetailsModalPro
                 <button
                   type="button"
                   onClick={() => setShiny((value) => !value)}
-                  className="rounded-full border border-neon-green/30 bg-black/20 px-4 py-2 text-sm font-bold text-[#f6ebd3] transition hover:border-neon-green/70 hover:bg-black/35"
+                  className="min-h-11 rounded-full border border-neon-green/30 bg-black/20 px-4 py-2 text-sm font-bold text-[#f6ebd3] transition hover:border-neon-green/70 hover:bg-black/35"
                 >
                   {shiny ? 'Mostrar normal' : 'Mostrar shiny'}
                 </button>
                 <button
                   type="button"
                   onClick={handleFavorite}
-                  className="rounded-full border border-neon-purple bg-neon-purple px-4 py-2 text-sm font-bold text-[#f8edd7] transition hover:brightness-110"
+                  className="min-h-11 rounded-full border border-neon-purple bg-neon-purple px-4 py-2 text-sm font-bold text-[#f8edd7] transition hover:brightness-110"
                 >
                   Favoritar
                 </button>
                 <button
                   type="button"
                   onClick={handleTeam}
-                  className="rounded-full border border-neon-green bg-neon-green px-4 py-2 text-sm font-bold text-[#24190e] transition hover:brightness-110"
+                  className="min-h-11 rounded-full border border-neon-green bg-neon-green px-4 py-2 text-sm font-bold text-[#24190e] transition hover:brightness-110"
                 >
                   Adicionar ao time
                 </button>

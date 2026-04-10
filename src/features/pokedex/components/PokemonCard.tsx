@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { PokemonSummary } from '@/types/pokemon';
 import { formatId } from '@/utils/pokemon';
@@ -17,11 +17,32 @@ export const PokemonCard = ({ pokemon, onSelect, onToggleFavorite, onAddToTeam, 
   const [shiny, setShiny] = useState(false);
   const [hoverSprite, setHoverSprite] = useState<string | null>(null);
   const [hovering, setHovering] = useState(false);
-  const spriteSize = 160;
+  const [canHover, setCanHover] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const query = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const update = (): void => {
+      setCanHover(query.matches);
+    };
+
+    update();
+    query.addEventListener('change', update);
+    return () => {
+      query.removeEventListener('change', update);
+    };
+  }, []);
 
   const sprite = hovering && hoverSprite ? hoverSprite : shiny ? pokemon.shinySprite : pokemon.sprite;
 
   const handleMouseEnter = async (): Promise<void> => {
+    if (!canHover) {
+      return;
+    }
+
     setHovering(true);
     try {
       const data = await getPokemonSprite(pokemon.name);
@@ -36,13 +57,17 @@ export const PokemonCard = ({ pokemon, onSelect, onToggleFavorite, onAddToTeam, 
   };
 
   const handleMouseLeave = (): void => {
+    if (!canHover) {
+      return;
+    }
+
     setHovering(false);
   };
 
   return (
     <motion.article
-      className="group relative overflow-hidden rounded-3xl border border-rose-300/30 bg-[linear-gradient(160deg,rgba(18,10,12,0.95),rgba(10,6,7,0.96))] p-4 shadow-neon transition hover:-translate-y-1 hover:border-rose-300/60"
-      whileHover={{ y: -3 }}
+      className="group relative overflow-hidden rounded-3xl border border-rose-300/30 bg-[linear-gradient(160deg,rgba(18,10,12,0.95),rgba(10,6,7,0.96))] p-3 shadow-neon transition hover:-translate-y-1 hover:border-rose-300/60 sm:p-4"
+      whileHover={canHover ? { y: -3 } : undefined}
       layout
       onMouseEnter={() => {
         void handleMouseEnter();
@@ -66,7 +91,7 @@ export const PokemonCard = ({ pokemon, onSelect, onToggleFavorite, onAddToTeam, 
           <span className="rounded-full border border-rose-300/30 bg-black/30 px-2.5 py-1 text-xs font-bold text-[#f0d9da]">{formatId(pokemon.id)}</span>
           <button
             type="button"
-            className="rounded-full border border-rose-300/35 bg-black/30 px-3 py-1 text-xs font-semibold text-[#f2dedd] transition hover:border-rose-300/70 hover:bg-rose-300/20"
+            className="min-h-11 rounded-full border border-rose-300/35 bg-black/30 px-3 py-1 text-xs font-semibold text-[#f2dedd] transition hover:border-rose-300/70 hover:bg-rose-300/20"
             onClick={(event) => {
               event.stopPropagation();
               setShiny((value) => !value);
@@ -76,12 +101,13 @@ export const PokemonCard = ({ pokemon, onSelect, onToggleFavorite, onAddToTeam, 
           </button>
         </div>
 
-        <div className="mx-auto mt-4 flex items-center justify-center rounded-2xl border border-rose-300/25 bg-black/25 p-4" style={{ width: spriteSize, height: spriteSize }}>
+        <div className="mx-auto mt-4 flex aspect-square w-full max-w-[10.5rem] items-center justify-center rounded-2xl border border-rose-300/25 bg-black/25 p-3 sm:max-w-[11.5rem] sm:p-4">
           <img
             src={sprite}
             alt={pokemon.name}
             className="drop-shadow-2xl transition duration-200 group-hover:scale-105"
             loading="lazy"
+            decoding="async"
             style={{ 
               imageRendering: 'crisp-edges',
               maxWidth: '100%',
@@ -110,14 +136,14 @@ export const PokemonCard = ({ pokemon, onSelect, onToggleFavorite, onAddToTeam, 
         <button
           type="button"
           onClick={() => onToggleFavorite(pokemon)}
-          className={`rounded-full border px-3 py-2 text-xs font-bold transition ${isFavorite ? 'border-rose-300 bg-rose-300 text-[#26070c]' : 'border-rose-300/30 bg-black/20 text-[#f6e8e8] hover:border-rose-300/55 hover:bg-black/35'}`}
+          className={`min-h-11 rounded-full border px-3 py-2 text-xs font-bold transition ${isFavorite ? 'border-rose-300 bg-rose-300 text-[#26070c]' : 'border-rose-300/30 bg-black/20 text-[#f6e8e8] hover:border-rose-300/55 hover:bg-black/35'}`}
         >
           {isFavorite ? 'Favorited' : 'Favorite'}
         </button>
         <button
           type="button"
           onClick={() => onAddToTeam(pokemon)}
-          className="rounded-full border border-rose-300 bg-rose-300 px-3 py-2 text-xs font-bold text-[#26070c] transition hover:brightness-110"
+          className="min-h-11 rounded-full border border-rose-300 bg-rose-300 px-3 py-2 text-xs font-bold text-[#26070c] transition hover:brightness-110"
         >
           Team
         </button>

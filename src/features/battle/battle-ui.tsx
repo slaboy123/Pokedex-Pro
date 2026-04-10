@@ -385,23 +385,23 @@ export const BattleView = ({ onViewChange }: BattleViewProps): JSX.Element => {
       : '';
 
   return (
-    <section className="battle-view fixed inset-0 z-50 flex h-screen w-screen flex-col bg-[linear-gradient(180deg,#0e1316_0%,#131d1e_100%)] text-[#ecf6f1]">
-      <header className="flex items-center justify-between border-b border-[#2f4240] bg-[#111c1e]/95 px-4 py-3">
+    <section className="battle-view fixed inset-0 z-50 flex h-[100dvh] min-h-[100dvh] w-screen flex-col bg-[linear-gradient(180deg,#0e1316_0%,#131d1e_100%)] text-[#ecf6f1]">
+      <header className="flex items-center justify-between border-b border-[#2f4240] bg-[#111c1e]/95 px-3 py-2.5 sm:px-4 sm:py-3">
         <div>
           <p className="text-[11px] uppercase tracking-[0.2em] text-[#a4c8b7]">Competitive Arena</p>
-          <p className="text-sm font-bold text-[#d9eee4]">Turn {round} • {DIFFICULTY_CONFIG[difficulty].label}</p>
+          <p className="text-xs font-bold text-[#d9eee4] sm:text-sm">Turn {round} • {DIFFICULTY_CONFIG[difficulty].label}</p>
         </div>
         <button
           type="button"
           onClick={() => switchView('pokedex', onViewChange)}
-          className="rounded-md border border-[#3f5752] bg-[#1a2b2a] px-3 py-1.5 text-xs font-bold text-[#daf2e6] hover:bg-[#243937]"
+          className="min-h-11 rounded-md border border-[#3f5752] bg-[#1a2b2a] px-3 py-2 text-xs font-bold text-[#daf2e6] hover:bg-[#243937]"
         >
           Exit Battle
         </button>
       </header>
 
-      <div className="grid min-h-0 flex-1 gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3">
+      <div className="battle-shell grid min-h-0 flex-1 gap-2 p-2 sm:gap-3 sm:p-3 lg:grid-cols-[minmax(0,1fr)_20rem] lg:p-4">
+        <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-2 sm:gap-3">
           <div className="relative">
             <BattleField
               playerPokemon={playerActive}
@@ -443,17 +443,17 @@ export const BattleView = ({ onViewChange }: BattleViewProps): JSX.Element => {
             ) : null}
           </div>
 
-          <section className="rounded-2xl border border-[#34514c] bg-[#132224]/95 p-3">
+          <section className="battle-controls rounded-2xl border border-[#34514c] bg-[#132224]/95 p-2.5 sm:p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="text-xs font-semibold text-[#a7cabd]">
+              <div className="text-[11px] font-semibold text-[#a7cabd] sm:text-xs">
                 Player Team {playerAlive}/6 • Enemy Team {enemyAlive}/6 • Phase {phase}
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto sm:flex-wrap">
                 <button
                   type="button"
                   onClick={() => void startBattle()}
                   disabled={processing}
-                  className="rounded-md border border-[#4d6c65] bg-[#27423f] px-3 py-1.5 text-xs font-bold disabled:opacity-50"
+                  className="min-h-11 rounded-md border border-[#4d6c65] bg-[#27423f] px-3 py-1.5 text-xs font-bold disabled:opacity-50"
                 >
                   Start
                 </button>
@@ -461,7 +461,7 @@ export const BattleView = ({ onViewChange }: BattleViewProps): JSX.Element => {
                   type="button"
                   onClick={() => setActionPanel('fight')}
                   disabled={phase !== 'player-turn' || processing || winner !== null}
-                  className={`rounded-md border px-3 py-1.5 text-xs font-bold disabled:opacity-50 ${actionPanel === 'fight' ? 'border-[#89b2a4] bg-[#30544e]' : 'border-[#4d6c65] bg-[#1a2f2c]'}`}
+                  className={`min-h-11 rounded-md border px-3 py-1.5 text-xs font-bold disabled:opacity-50 ${actionPanel === 'fight' ? 'border-[#89b2a4] bg-[#30544e]' : 'border-[#4d6c65] bg-[#1a2f2c]'}`}
                 >
                   Fight
                 </button>
@@ -469,21 +469,21 @@ export const BattleView = ({ onViewChange }: BattleViewProps): JSX.Element => {
                   type="button"
                   onClick={() => setActionPanel('switch')}
                   disabled={phase !== 'player-turn' || processing || winner !== null}
-                  className={`rounded-md border px-3 py-1.5 text-xs font-bold disabled:opacity-50 ${actionPanel === 'switch' ? 'border-[#89b2a4] bg-[#30544e]' : 'border-[#4d6c65] bg-[#1a2f2c]'}`}
+                  className={`min-h-11 rounded-md border px-3 py-1.5 text-xs font-bold disabled:opacity-50 ${actionPanel === 'switch' ? 'border-[#89b2a4] bg-[#30544e]' : 'border-[#4d6c65] bg-[#1a2f2c]'}`}
                 >
                   Switch
                 </button>
               </div>
             </div>
 
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
               {(Object.entries(DIFFICULTY_CONFIG) as Array<[BattleDifficulty, (typeof DIFFICULTY_CONFIG)[BattleDifficulty]]>).map(([key, config]) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => setDifficulty(key)}
                   disabled={phase !== 'setup' || processing}
-                  className={`rounded-md border px-3 py-1 text-xs font-semibold disabled:opacity-45 ${difficulty === key ? 'border-[#9bc7b7] bg-[#2f4b48]' : 'border-[#4d6c65] bg-[#172b2a]'}`}
+                  className={`min-h-11 rounded-md border px-3 py-1 text-xs font-semibold disabled:opacity-45 ${difficulty === key ? 'border-[#9bc7b7] bg-[#2f4b48]' : 'border-[#4d6c65] bg-[#172b2a]'}`}
                 >
                   {config.label}
                 </button>
@@ -491,13 +491,13 @@ export const BattleView = ({ onViewChange }: BattleViewProps): JSX.Element => {
             </div>
 
             {phase === 'setup' ? (
-              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {team.map((member) => (
                   <button
                     key={member.id}
                     type="button"
                     onClick={() => setSelectedPlayerId(member.id)}
-                    className={`rounded-md border px-3 py-2 text-left text-xs ${selectedPlayerId === member.id ? 'border-[#9bc7b7] bg-[#2f4b48]' : 'border-[#4d6c65] bg-[#172b2a]'}`}
+                    className={`min-h-11 rounded-md border px-3 py-2 text-left text-xs ${selectedPlayerId === member.id ? 'border-[#9bc7b7] bg-[#2f4b48]' : 'border-[#4d6c65] bg-[#172b2a]'}`}
                   >
                     <p className="font-bold uppercase">{member.name}</p>
                     <p className="mt-1 text-[11px] text-[#9ebcb1]">Lead Pokémon</p>
@@ -507,7 +507,7 @@ export const BattleView = ({ onViewChange }: BattleViewProps): JSX.Element => {
             ) : null}
 
             {actionPanel === 'fight' ? (
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="battle-controls-grid mt-3 grid grid-cols-2 gap-2">
                 {(playerActive?.moves ?? []).map((move, index) => (
                   <button
                     key={`${move.name}-${index}`}
@@ -517,7 +517,7 @@ export const BattleView = ({ onViewChange }: BattleViewProps): JSX.Element => {
                       setSelectedMoveIndex(index);
                       void executeAction({ type: 'fight', moveIndex: index });
                     }}
-                    className={`rounded-md border px-3 py-2 text-left text-xs disabled:opacity-50 ${selectedMoveIndex === index ? 'border-[#9bc7b7] bg-[#2f4b48]' : 'border-[#4d6c65] bg-[#172b2a]'}`}
+                    className={`min-h-11 rounded-md border px-3 py-2 text-left text-xs disabled:opacity-50 ${selectedMoveIndex === index ? 'border-[#9bc7b7] bg-[#2f4b48]' : 'border-[#4d6c65] bg-[#172b2a]'}`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-bold uppercase">{move.name}</span>
@@ -528,14 +528,14 @@ export const BattleView = ({ onViewChange }: BattleViewProps): JSX.Element => {
                 ))}
               </div>
             ) : (
-              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {(playerSide?.roster ?? []).map((fighter, index) => (
                   <button
                     key={`${fighter.id}-${index}`}
                     type="button"
                     disabled={fighter.currentHp <= 0 || index === playerSide?.activeIndex || phase !== 'player-turn' || processing}
                     onClick={() => void onSelectSwitch(index)}
-                    className={`rounded-md border px-3 py-2 text-left text-xs disabled:opacity-45 ${index === playerSide?.activeIndex ? 'border-[#89b2a4] bg-[#2f4b48]' : 'border-[#4d6c65] bg-[#172b2a]'}`}
+                    className={`min-h-11 rounded-md border px-3 py-2 text-left text-xs disabled:opacity-45 ${index === playerSide?.activeIndex ? 'border-[#89b2a4] bg-[#2f4b48]' : 'border-[#4d6c65] bg-[#172b2a]'}`}
                   >
                     <p className="font-bold uppercase">{fighter.name}</p>
                     <p className="mt-1 text-[11px] text-[#9ebcb1]">HP {fighter.currentHp}/{fighter.maxHp}</p>
@@ -550,12 +550,12 @@ export const BattleView = ({ onViewChange }: BattleViewProps): JSX.Element => {
           </section>
         </div>
 
-        <aside className="flex min-h-0 flex-col rounded-2xl border border-[#34514c] bg-[#132224]/95 p-3">
-          <h3 className="text-sm font-black uppercase text-[#d7eee3]">Battle Log</h3>
-          <p className="mt-1 text-[11px] text-[#9dbeb2]">Atualização em tempo real</p>
-          <div ref={logRef} className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+        <aside className="battle-log-pane order-last flex min-h-0 max-h-44 flex-col rounded-2xl border border-[#34514c] bg-[#132224]/95 p-2.5 sm:max-h-52 sm:p-3 lg:order-none lg:max-h-none">
+          <h3 className="text-xs font-black uppercase text-[#d7eee3] sm:text-sm">Battle Log</h3>
+          <p className="mt-1 text-[10px] text-[#9dbeb2] sm:text-[11px]">Atualização em tempo real</p>
+          <div ref={logRef} className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 sm:mt-3">
             {logEntries.length > 0 ? logEntries.map((entry) => (
-              <p key={entry.id} className={`rounded-md border px-2.5 py-2 text-xs ${entry.tone === 'success' ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200' : entry.tone === 'warning' ? 'border-amber-400/40 bg-amber-400/10 text-amber-200' : entry.tone === 'danger' ? 'border-rose-400/40 bg-rose-400/10 text-rose-200' : 'border-[#44655f] bg-[#19302d] text-[#d8ece4]'}`}>
+              <p key={entry.id} className={`rounded-md border px-2 py-1.5 text-[11px] sm:px-2.5 sm:py-2 sm:text-xs ${entry.tone === 'success' ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200' : entry.tone === 'warning' ? 'border-amber-400/40 bg-amber-400/10 text-amber-200' : entry.tone === 'danger' ? 'border-rose-400/40 bg-rose-400/10 text-rose-200' : 'border-[#44655f] bg-[#19302d] text-[#d8ece4]'}`}>
                 {entry.text}
               </p>
             )) : (

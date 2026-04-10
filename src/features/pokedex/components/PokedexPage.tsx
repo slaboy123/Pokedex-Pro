@@ -55,7 +55,7 @@ export const PokedexPage = (): JSX.Element => {
   };
 
   return (
-    <div className="grid gap-4 md:gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+    <div className="grid gap-4 md:gap-6 xl:grid-cols-[minmax(17rem,20rem)_minmax(0,1fr)]">
       <div className="space-y-6">
         <FiltersSidebar
           filters={filters}
@@ -82,7 +82,7 @@ export const PokedexPage = (): JSX.Element => {
         </div>
       </div>
 
-      <div className="space-y-4 md:space-y-6">
+      <div className="space-y-4 md:space-y-6 min-w-0">
         <section className="rpg-panel p-5 md:p-7">
           <p className="text-xs uppercase tracking-[0.3em] text-neon-purple">Pokedex</p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-[#f8edd7] sm:text-4xl md:text-5xl">Grimorio de Monstros</h1>

@@ -14,6 +14,8 @@ interface PokemonSpriteProps {
   isShaking: boolean;
   isFading: boolean;
   isLunging: boolean;
+  compact: boolean;
+  compactLandscape: boolean;
 }
 
 const randomShake = (): { x: number; y: number } => ({
@@ -32,13 +34,25 @@ const PokemonSprite = ({
   isShaking,
   isFading,
   isLunging,
+  compact,
+  compactLandscape,
 }: PokemonSpriteProps): JSX.Element => {
   const shakeOffset = isShaking ? randomShake() : { x: 0, y: 0 };
-  const scale = depth === 'near' ? 1.32 : 0.92;
+  const scale = compact ? (depth === 'near' ? 1.12 : 0.82) : depth === 'near' ? 1.32 : 0.92;
   const zIndex = depth === 'near' ? 50 : 30;
-  const lungeOffset = isLunging ? (side === 'player' ? 28 : -28) : 0;
+  const lungeOffset = isLunging ? (side === 'player' ? (compact ? 16 : 28) : compact ? -16 : -28) : 0;
   const brightness = isHit ? 1.7 : depth === 'far' ? 0.92 : 1;
-  const spriteSize = depth === 'near' ? 200 : 150;
+  const spriteSize = compactLandscape
+    ? depth === 'near'
+      ? 120
+      : 88
+    : compact
+      ? depth === 'near'
+        ? 144
+        : 108
+      : depth === 'near'
+        ? 200
+        : 150;
 
   return (
     <div
@@ -107,6 +121,23 @@ export const BattleField = ({
 }: BattleFieldProps): JSX.Element => {
   const [playerSprite, setPlayerSprite] = useState<string | null>(null);
   const [enemySprite, setEnemySprite] = useState<string | null>(null);
+  const [viewport, setViewport] = useState({ width: 1280, height: 720 });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const updateViewport = (): void => {
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    };
+
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    return () => {
+      window.removeEventListener('resize', updateViewport);
+    };
+  }, []);
 
   useEffect(() => {
     const load = async (): Promise<void> => {
@@ -156,6 +187,8 @@ export const BattleField = ({
 
   const playerHp = playerPokemon ? hpPercent(playerDisplayedHp, playerPokemon.maxHp) : 0;
   const enemyHp = enemyPokemon ? hpPercent(enemyDisplayedHp, enemyPokemon.maxHp) : 0;
+  const isMobile = viewport.width < 768;
+  const isLandscapeMobile = isMobile && viewport.width > viewport.height;
 
   const projectileTransform = animationState.projectile
     ? animationState.projectile.from === 'player'
@@ -165,7 +198,7 @@ export const BattleField = ({
 
   return (
     <section
-      className="battlefield relative h-full min-h-[360px] overflow-hidden rounded-2xl border border-[#4f5c53] bg-[#33543a]"
+      className="battlefield battle-mobile-landscape relative h-full min-h-[280px] overflow-hidden rounded-2xl border border-[#4f5c53] bg-[#33543a] sm:min-h-[340px] lg:min-h-[420px]"
       style={{
         transform: `translate3d(${animationState.camera.x}px, ${animationState.camera.y}px, 0)`,
       }}
@@ -174,6 +207,7 @@ export const BattleField = ({
         src={forestBattleBackground}
         alt="Forest battle background"
         className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+        loading="lazy"
       />
 
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_80%,rgba(255,255,255,0.28),transparent_52%)]" />
@@ -181,10 +215,10 @@ export const BattleField = ({
 
       {animationState.impactFlash ? <div className="pointer-events-none absolute inset-0 bg-white/80" /> : null}
 
-      <div className="absolute right-4 top-4 z-30 w-[260px] rounded-lg border border-[#5e6a63] bg-[#f6fbf5]/90 p-3 shadow-lg">
+      <div className="absolute right-2 top-2 z-30 w-[min(78vw,16rem)] rounded-lg border border-[#5e6a63] bg-[#f6fbf5]/90 p-2.5 shadow-lg sm:right-4 sm:top-4 sm:w-[260px] sm:p-3">
         <div className="flex items-start justify-between gap-2 text-[#27322d]">
           <div>
-            <p className="text-sm font-black uppercase">{enemyPokemon?.name ?? 'Enemy'}</p>
+            <p className="text-xs font-black uppercase sm:text-sm">{enemyPokemon?.name ?? 'Enemy'}</p>
             <p className="text-[11px] font-semibold text-[#516156]">Lv {enemyPokemon?.level ?? '--'} • {statusLabel(enemyPokemon?.status ?? null)}</p>
           </div>
           <p className="text-xs font-semibold text-[#34463d]">{Math.max(0, Math.round(enemyDisplayedHp))}/{enemyPokemon?.maxHp ?? 0}</p>
@@ -194,10 +228,10 @@ export const BattleField = ({
         </div>
       </div>
 
-      <div className="absolute bottom-5 left-4 z-40 w-[280px] rounded-lg border border-[#55635a] bg-[#f6fbf5]/92 p-3 shadow-xl">
+      <div className="absolute bottom-2 left-2 z-40 w-[min(82vw,17rem)] rounded-lg border border-[#55635a] bg-[#f6fbf5]/92 p-2.5 shadow-xl sm:bottom-5 sm:left-4 sm:w-[280px] sm:p-3">
         <div className="flex items-start justify-between gap-2 text-[#27322d]">
           <div>
-            <p className="text-sm font-black uppercase">{playerPokemon?.name ?? 'Player'}</p>
+            <p className="text-xs font-black uppercase sm:text-sm">{playerPokemon?.name ?? 'Player'}</p>
             <p className="text-[11px] font-semibold text-[#516156]">Lv {playerPokemon?.level ?? '--'} • {statusLabel(playerPokemon?.status ?? null)}</p>
           </div>
           <p className="text-xs font-semibold text-[#34463d]">{Math.max(0, Math.round(playerDisplayedHp))}/{playerPokemon?.maxHp ?? 0}</p>
@@ -208,7 +242,7 @@ export const BattleField = ({
       </div>
 
       <div className="absolute inset-0 z-10">
-        <div className="absolute right-[18%] top-[18%]">
+        <div className="absolute right-[10%] top-[14%] sm:right-[18%] sm:top-[18%]">
           {enemyPokemon ? (
             <PokemonSprite
               src={enemySprite ?? enemyPokemon.sprite}
@@ -221,11 +255,13 @@ export const BattleField = ({
               isFading={animationState.fadingSide === 'enemy'}
               isLunging={animationState.lungingSide === 'enemy'}
               depth="far"
+              compact={isMobile}
+              compactLandscape={isLandscapeMobile}
             />
           ) : null}
         </div>
 
-        <div className="absolute bottom-[9%] left-[10%]">
+        <div className="absolute bottom-[8%] left-[6%] sm:bottom-[9%] sm:left-[10%]">
           {playerPokemon ? (
             <PokemonSprite
               src={playerSprite ?? playerPokemon.sprite}
@@ -238,6 +274,8 @@ export const BattleField = ({
               isFading={animationState.fadingSide === 'player'}
               isLunging={animationState.lungingSide === 'player'}
               depth="near"
+              compact={isMobile}
+              compactLandscape={isLandscapeMobile}
             />
           ) : null}
         </div>
